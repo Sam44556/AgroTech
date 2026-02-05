@@ -13,8 +13,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ORIGINAL TABLES - UNCHANGED
 model User {
-  id    String  @id @default(cuid())  // Change from Int to String
+  id    String  @id @default(cuid())
   email String  @unique
   name  String?
   phone         String?   @unique
@@ -26,6 +27,33 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+
+  // Relations to NEW tables only
+  farmerProfile FarmerProfile?
+  buyerProfile  BuyerProfile?
+  expertProfile ExpertProfile?
+  
+  // Farmer relations
+  produce       Produce[]
+  farmerConversations Conversation[] @relation("FarmerConversations")
+  farmerMessages Message[] @relation("FarmerMessages")
+  weatherAlerts WeatherAlert[]
+  priceAlerts   PriceAlert[]
+  
+  // Buyer relations
+  buyerConversations Conversation[] @relation("BuyerConversations")
+  buyerMessages Message[] @relation("BuyerMessages")
+  orders        Order[]
+  favorites     Favorite[]
+  reviews       Review[]
+  
+  // Expert relations
+  consultations Consultation[]
+  articles      Article[]
+  advisories    Advisory[]
+  
+  // Admin relations
+  systemAlerts  SystemAlert[]
 
   @@map("user")
 }
@@ -77,9 +105,499 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
+
+// ENUMS
 enum UserRole {
   FARMER
   BUYER
   EXPERT
   ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ProduceStatus {
+  AVAILABLE
+  SOLD_OUT
+  PENDING
+  INACTIVE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ConsultationStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum WeatherCondition {
+  SUNNY
+  CLOUDY
+  PARTLY_CLOUDY
+  RAINY
+  STORMY
+}
+
+// NEW TABLES - ADDITIONAL TO EXISTING SCHEMA
+
+// User Profile Extensions (connects to existing User table)
+model FarmerProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio           String?
+  farmSize      Float?
+  farmSizeUnit  String?   @default("hectares")
+  experienceYears Int?
+  specializations String[] // Array of crop types
+  verificationStatus VerificationStatus @default(PENDING)
+  totalRevenue    Float @default(0)
+  activeListings  Int   @default(0)
+  totalSales      Int   @default(0)
+  rating          Float @default(0)
+  reviewCount     Int   @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("farmer_profile")
+}
+
+model BuyerProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalOrders     Int   @default(0)
+  totalSpent      Float @default(0)
+  favoriteCount   Int   @default(0)
+  deliveryAddress String?
+  paymentMethod   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("buyer_profile")
+}
+
+model ExpertProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bio               String?
+  specializations   String[]
+  consultationCount Int   @default(0)
+  totalEarnings     Float @default(0)
+  rating            Float @default(0)
+  reviewCount       Int   @default(0)
+  hourlyRate        Float @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("expert_profile")
+}
+
+// Categories for Produce
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String?
+  isActive    Boolean   @default(true)
+  
+  produce     Produce[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("category")
+}
+
+// Farmer's Produce Listings
+model Produce {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  quantity    Float
+  unit        String        @default("kg")
+  status      ProduceStatus @default(AVAILABLE)
+  images      String[]      // Array of image URLs
+  
+  farmerId    String
+  farmer      User          @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id])
+  
+  viewCount     Int @default(0)
+  inquiryCount  Int @default(0)
+  
+  // Relations
+  orderItems    OrderItem[]
+  favorites     Favorite[]
+  conversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([farmerId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("produce")
+}
+
+// Orders and Order Items
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique @default(cuid())
+  status      OrderStatus @default(PENDING)
+  totalAmount Float
+  
+  buyerId     String
+  buyer       User        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  
+  deliveryAddress String
+  deliveryDate    DateTime?
+  notes           String?
+  
+  orderItems  OrderItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([buyerId])
+  @@index([status])
+  @@map("order")
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  quantity Float
+  price    Float
+  
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  produceId String
+  produce   Produce @relation(fields: [produceId], references: [id])
+  
+  @@index([orderId])
+  @@index([produceId])
+  @@map("order_item")
+}
+
+// Favorites/Wishlist
+model Favorite {
+  id String @id @default(cuid())
+  
+  buyerId   String
+  buyer     User    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  
+  produceId String
+  produce   Produce @relation(fields: [produceId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([buyerId, produceId])
+  @@map("favorite")
+}
+
+// Chat System
+model Conversation {
+  id String @id @default(cuid())
+  
+  farmerId String
+  farmer   User   @relation("FarmerConversations", fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  buyerId String
+  buyer   User   @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  
+  produceId String?
+  produce   Produce? @relation(fields: [produceId], references: [id])
+  
+  lastMessageAt DateTime @default(now())
+  isActive      Boolean  @default(true)
+  
+  messages Message[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([farmerId, buyerId, produceId])
+  @@index([farmerId])
+  @@index([buyerId])
+  @@map("conversation")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  content     String
+  messageType MessageType @default(TEXT)
+  fileUrl     String?     // For image/file messages
+  
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderId   String
+  senderType UserRole
+  
+  // Polymorphic relation - either farmer or buyer
+  farmerSender User? @relation("FarmerMessages", fields: [senderId], references: [id])
+  buyerSender  User? @relation("BuyerMessages", fields: [senderId], references: [id])
+  
+  isRead    Boolean @default(false)
+  readAt    DateTime?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("message")
+}
+
+// Market Price Data
+model MarketPrice {
+  id            String @id @default(cuid())
+  cropName      String
+  currentPrice  Float
+  previousPrice Float
+  change        Float
+  changePercent Float
+  unit          String @default("quintal")
+  region        String @default("National")
+  marketSession String @default("Morning")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([cropName])
+  @@index([region])
+  @@map("market_price")
+}
+
+// Weather Data
+model WeatherData {
+  id          String           @id @default(cuid())
+  location    String
+  date        DateTime
+  temperature Float
+  humidity    Float
+  windSpeed   Float
+  rainfall    Float
+  uvIndex     Int
+  condition   WeatherCondition
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([location, date])
+  @@index([location])
+  @@map("weather_data")
+}
+
+// Alerts System
+model WeatherAlert {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  severity    AlertSeverity
+  location    String
+  alertType   String        // weather, pest, disease
+  
+  farmerId String
+  farmer   User   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  isRead    Boolean  @default(false)
+  expiresAt DateTime
+  
+  createdAt DateTime @default(now())
+  
+  @@index([farmerId])
+  @@index([location])
+  @@map("weather_alert")
+}
+
+model PriceAlert {
+  id          String @id @default(cuid())
+  cropName    String
+  targetPrice Float
+  condition   String // above, below
+  isActive    Boolean @default(true)
+  
+  farmerId String
+  farmer   User   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  triggeredAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([farmerId])
+  @@map("price_alert")
+}
+
+model SystemAlert {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  alertType   String        // system, security, maintenance
+  severity    AlertSeverity
+  
+  adminId String
+  admin   User   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  isResolved Boolean  @default(false)
+  resolvedAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([adminId])
+  @@index([alertType])
+  @@map("system_alert")
+}
+
+// Expert Consultation System
+model Consultation {
+  id          String             @id @default(cuid())
+  title       String
+  description String
+  status      ConsultationStatus @default(PENDING)
+  
+  farmerId String
+  farmer   User   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  
+  expertId String
+  expert   User   @relation(fields: [expertId], references: [id])
+  
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  hourlyRate Float
+  totalCost  Float?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([farmerId])
+  @@index([expertId])
+  @@map("consultation")
+}
+
+// Expert Articles/Knowledge Base
+model Article {
+  id          String @id @default(cuid())
+  title       String
+  content     String
+  excerpt     String?
+  coverImage  String?
+  tags        String[]
+  isPublished Boolean @default(false)
+  viewCount   Int     @default(0)
+  
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([authorId])
+  @@index([isPublished])
+  @@map("article")
+}
+
+// Agricultural Advisories
+model Advisory {
+  id               String   @id @default(cuid())
+  title            String
+  description      String
+  advisoryType     String   // planting, pest, fertilizer, harvest
+  severity         AlertSeverity
+  affectedCrops    String[]
+  recommendations  String[]
+  location         String
+  
+  expertId String
+  expert   User   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([expertId])
+  @@index([location])
+  @@index([advisoryType])
+  @@map("advisory")
+}
+
+// Reviews and Ratings
+model Review {
+  id       String @id @default(cuid())
+  rating   Int    // 1-5 stars
+  comment  String?
+  reviewType String // farmer, product, expert
+  
+  reviewerId String
+  reviewer   User   @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  
+  targetId String // farmerId, produceId, or expertId
+  
+  createdAt DateTime @default(now())
+  
+  @@index([reviewerId])
+  @@index([targetId])
+  @@map("review")
+}
+
+// Notifications
+model Notification {
+  id      String @id @default(cuid())
+  title   String
+  message String
+  type    String // price_alert, weather, message, order, system
+  
+  userId String
+  
+  isRead Boolean @default(false)
+  readAt DateTime?
+  
+  metadata Json? // Additional data for the notification
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([type])
+  @@map("notification")
 }
