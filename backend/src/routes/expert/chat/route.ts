@@ -1,21 +1,21 @@
 import { Router, Request, Response } from "express";
-import { farmerOnlyRoute } from "../../../middleware/auths";
+import { expertOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
 
 const router = Router();
 
 /**
- * GET /api/farmer/chat/conversations - Get farmer conversations
+ * GET /api/expert/chat/conversations - Get expert conversations
  */
-router.get("/conversations", farmerOnlyRoute, async (req: Request, res: Response) => {
+router.get("/conversations", expertOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const farmerId = req.user!.id;
+    const expertId = req.user!.id;
 
     const conversations = await prisma.conversation.findMany({
       where: {
         participants: {
           some: {
-            userId: farmerId
+            userId: expertId
           }
         }
       },
@@ -64,7 +64,7 @@ router.get("/conversations", farmerOnlyRoute, async (req: Request, res: Response
       data: formatted
     });
   } catch (error) {
-    console.error("❌ Error fetching conversations:", error);
+    console.error("❌ Error fetching expert conversations:", error);
     res.status(500).json({
       error: "Failed to fetch conversations",
       message: "Could not retrieve conversations"
@@ -73,17 +73,17 @@ router.get("/conversations", farmerOnlyRoute, async (req: Request, res: Response
 });
 
 /**
- * GET /api/farmer/chat/conversations/:id/messages - Get messages for a conversation
+ * GET /api/expert/chat/conversations/:id/messages - Get messages for a conversation
  */
-router.get("/conversations/:id/messages", farmerOnlyRoute, async (req: Request, res: Response) => {
+router.get("/conversations/:id/messages", expertOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const farmerId = req.user!.id;
+    const expertId = req.user!.id;
     const conversationId = req.params.id;
 
     const conversation = await prisma.conversation.findFirst({
       where: {
         id: conversationId,
-        participants: { some: { userId: farmerId } }
+        participants: { some: { userId: expertId } }
       }
     });
 
@@ -102,7 +102,8 @@ router.get("/conversations/:id/messages", farmerOnlyRoute, async (req: Request, 
           select: {
             id: true,
             name: true,
-            image: true
+            image: true,
+            role: true
           }
         }
       }
@@ -122,11 +123,11 @@ router.get("/conversations/:id/messages", farmerOnlyRoute, async (req: Request, 
 });
 
 /**
- * POST /api/farmer/chat/conversations/:id/messages - Send a message
+ * POST /api/expert/chat/conversations/:id/messages - Send a message
  */
-router.post("/conversations/:id/messages", farmerOnlyRoute, async (req: Request, res: Response) => {
+router.post("/conversations/:id/messages", expertOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const farmerId = req.user!.id;
+    const expertId = req.user!.id;
     const conversationId = req.params.id;
     const { content } = req.body;
 
@@ -139,7 +140,7 @@ router.post("/conversations/:id/messages", farmerOnlyRoute, async (req: Request,
     const conversation = await prisma.conversation.findFirst({
       where: {
         id: conversationId,
-        participants: { some: { userId: farmerId } }
+        participants: { some: { userId: expertId } }
       }
     });
 
@@ -154,14 +155,15 @@ router.post("/conversations/:id/messages", farmerOnlyRoute, async (req: Request,
       data: {
         content,
         conversationId,
-        senderId: farmerId
+        senderId: expertId
       },
       include: {
         sender: {
           select: {
             id: true,
             name: true,
-            image: true
+            image: true,
+            role: true
           }
         }
       }

@@ -85,23 +85,31 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
     ]);
 
     // Get top categories by purchase frequency
-    const topCategories = await prisma.orderItem.groupBy({
-      by: ['produceId'],
-      where: {
-        order: {
-          buyerId
-        }
-      },
-      _count: {
-        _all: true
-      },
-      orderBy: {
-        _count: {
-          _all: 'desc'
-        }
-      },
-      take: 5
+    // First get all buyer's orders
+    const buyerOrders = await prisma.order.findMany({
+      where: { buyerId },
+      select: { id: true }
     });
+    
+    const orderIds = buyerOrders.map((o: { id: string }) => o.id);
+    
+    const topCategories = orderIds.length > 0 
+      ? await prisma.orderItem.groupBy({
+          by: ['produceId'],
+          where: {
+            orderId: { in: orderIds }
+          },
+          _count: {
+            _all: true
+          },
+          orderBy: {
+            _count: {
+              _all: 'desc'
+            }
+          },
+          take: 5
+        })
+      : [];
 
     // Get the actual category names
     const categoryDetails = await Promise.all(
@@ -146,23 +154,26 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
           select: {
             name: true
           }
-        },
-        reviews: {
-          select: {
-            rating: true
-          }
         }
       }
     });
 
-    // Add computed fields to recommended products
-    const productsWithStats = recommendedProducts.map((product: typeof recommendedProducts[0]) => ({
-      ...product,
-      averageRating: product.reviews.length > 0 
-        ? product.reviews.reduce((sum: number, r: typeof product.reviews[0]) => sum + r.rating, 0) / product.reviews.length 
-        : 0,
-      reviewCount: product.reviews.length
-    }));
+    // Add computed fields to recommended products (reviews via separate query since Review uses targetId)
+    const productsWithStats = await Promise.all(
+      recommendedProducts.map(async (product: typeof recommendedProducts[0]) => {
+        const reviews = await prisma.review.findMany({
+          where: { targetId: product.id, reviewType: 'product' },
+          select: { rating: true }
+        });
+        return {
+          ...product,
+          averageRating: reviews.length > 0 
+            ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length 
+            : 0,
+          reviewCount: reviews.length
+        };
+      })
+    );
 
     // Calculate savings (mock data - implement actual discount tracking)
     const totalSavings = Math.floor((totalSpent._sum.totalAmount || 0) * 0.12); // 12% average savings

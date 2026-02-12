@@ -11,8 +11,8 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const {
       status = 'all',
-      priority = 'all',
-      category = 'all',
+      severity: severityFilter = 'all',
+      alertType = 'all',
       page = 1,
       limit = 20
     } = req.query;
@@ -20,41 +20,35 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const where: any = {};
 
-    // Apply filters
     if (status !== 'all') {
       where.isResolved = status === 'resolved';
     }
 
-    if (priority !== 'all') {
-      where.priority = priority;
+    if (severityFilter !== 'all') {
+      where.severity = severityFilter;
     }
 
-    if (category !== 'all') {
-      where.category = category;
+    if (alertType !== 'all') {
+      where.alertType = alertType;
     }
 
     const [alerts, totalCount] = await Promise.all([
-      prisma.alert.findMany({
+      prisma.systemAlert.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: parseInt(limit as string),
         include: {
-          resolvedBy: {
+          admin: {
             select: {
               id: true,
               email: true,
-              profile: {
-                select: {
-                  firstName: true,
-                  lastName: true
-                }
-              }
+              name: true
             }
           }
         }
       }),
-      prisma.alert.count({ where })
+      prisma.systemAlert.count({ where })
     ]);
 
     // Get alert statistics
@@ -64,16 +58,16 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
       unresolvedAlerts,
       resolvedToday
     ] = await Promise.all([
-      prisma.alert.count({
-        where: { priority: 'CRITICAL', isResolved: false }
+      prisma.systemAlert.count({
+        where: { severity: 'CRITICAL', isResolved: false }
       }),
-      prisma.alert.count({
-        where: { priority: 'HIGH', isResolved: false }
+      prisma.systemAlert.count({
+        where: { severity: 'HIGH', isResolved: false }
       }),
-      prisma.alert.count({
+      prisma.systemAlert.count({
         where: { isResolved: false }
       }),
-      prisma.alert.count({
+      prisma.systemAlert.count({
         where: {
           isResolved: true,
           resolvedAt: {
@@ -118,19 +112,14 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const alertId = req.params.id;
 
-    const alert = await prisma.alert.findUnique({
+    const alert = await prisma.systemAlert.findUnique({
       where: { id: alertId },
       include: {
-        resolvedBy: {
+        admin: {
           select: {
             id: true,
             email: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true
-              }
-            }
+            name: true
           }
         }
       }
@@ -164,28 +153,26 @@ router.post("/", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const {
       title,
-      message,
-      priority = 'MEDIUM',
-      category = 'SYSTEM',
-      metadata
+      description,
+      severity = 'MEDIUM',
+      alertType = 'system'
     } = req.body;
 
-    if (!title || !message) {
+    if (!title || !description) {
       return res.status(400).json({
         success: false,
-        message: "Title and message are required"
+        message: "Title and description are required"
       });
     }
 
-    const alert = await prisma.alert.create({
+    const alert = await prisma.systemAlert.create({
       data: {
         title,
-        message,
-        priority,
-        category,
-        metadata: metadata || {},
-        isResolved: false,
-        createdBy: req.user!.id
+        description,
+        severity,
+        alertType,
+        adminId: req.user!.id,
+        isResolved: false
       }
     });
 
@@ -210,9 +197,8 @@ router.post("/", adminOnlyRoute, async (req: Request, res: Response) => {
 router.patch("/:id/resolve", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const alertId = req.params.id;
-    const { resolution } = req.body;
 
-    const alert = await prisma.alert.findUnique({
+    const alert = await prisma.systemAlert.findUnique({
       where: { id: alertId }
     });
 
@@ -230,25 +216,11 @@ router.patch("/:id/resolve", adminOnlyRoute, async (req: Request, res: Response)
       });
     }
 
-    const updatedAlert = await prisma.alert.update({
+    const updatedAlert = await prisma.systemAlert.update({
       where: { id: alertId },
       data: {
         isResolved: true,
-        resolvedAt: new Date(),
-        resolvedById: req.user!.id,
-        resolution: resolution || 'Resolved by admin'
-      },
-      include: {
-        resolvedBy: {
-          select: {
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true
-              }
-            }
-          }
-        }
+        resolvedAt: new Date()
       }
     });
 
@@ -274,7 +246,7 @@ router.patch("/:id/reopen", adminOnlyRoute, async (req: Request, res: Response) 
   try {
     const alertId = req.params.id;
 
-    const alert = await prisma.alert.findUnique({
+    const alert = await prisma.systemAlert.findUnique({
       where: { id: alertId }
     });
 
@@ -292,13 +264,11 @@ router.patch("/:id/reopen", adminOnlyRoute, async (req: Request, res: Response) 
       });
     }
 
-    const updatedAlert = await prisma.alert.update({
+    const updatedAlert = await prisma.systemAlert.update({
       where: { id: alertId },
       data: {
         isResolved: false,
-        resolvedAt: null,
-        resolvedById: null,
-        resolution: null
+        resolvedAt: null
       }
     });
 
@@ -324,7 +294,7 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const alertId = req.params.id;
 
-    const alert = await prisma.alert.findUnique({
+    const alert = await prisma.systemAlert.findUnique({
       where: { id: alertId }
     });
 
@@ -335,7 +305,7 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
       });
     }
 
-    await prisma.alert.delete({
+    await prisma.systemAlert.delete({
       where: { id: alertId }
     });
 
@@ -354,7 +324,7 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
 });
 
 /**
- * PATCH /api/admin/alerts/:id/priority - Update alert priority
+ * PATCH /api/admin/alerts/:id/priority - Update alert severity
  */
 router.patch("/:id/priority", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
@@ -368,7 +338,7 @@ router.patch("/:id/priority", adminOnlyRoute, async (req: Request, res: Response
       });
     }
 
-    const alert = await prisma.alert.findUnique({
+    const alert = await prisma.systemAlert.findUnique({
       where: { id: alertId }
     });
 
@@ -379,9 +349,9 @@ router.patch("/:id/priority", adminOnlyRoute, async (req: Request, res: Response
       });
     }
 
-    const updatedAlert = await prisma.alert.update({
+    const updatedAlert = await prisma.systemAlert.update({
       where: { id: alertId },
-      data: { priority }
+      data: { severity: priority }
     });
 
     res.json({

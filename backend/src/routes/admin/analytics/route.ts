@@ -11,8 +11,7 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const { 
       startDate, 
-      endDate,
-      metrics = 'all'
+      endDate
     } = req.query;
 
     // Set default date range (last 30 days)
@@ -23,7 +22,6 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     const [
       totalUsers,
       newUsersThisMonth,
-      activeUsers,
       usersByRole,
       userGrowthData
     ] = await Promise.all([
@@ -32,13 +30,6 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
         where: {
           createdAt: {
             gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          }
-        }
-      }),
-      prisma.user.count({
-        where: {
-          lastActiveAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
           }
         }
       }),
@@ -60,47 +51,14 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     const [
       totalProducts,
       activeProducts,
-      productsByCategory,
-      averageProductRating,
-      topProducts
+      averageProductRating
     ] = await Promise.all([
       prisma.produce.count(),
       prisma.produce.count({
         where: { status: 'AVAILABLE' }
       }),
-      prisma.produce.groupBy({
-        by: ['categoryId'],
-        _count: { categoryId: true },
-        include: {
-          category: {
-            select: { name: true }
-          }
-        }
-      }),
       prisma.review.aggregate({
         _avg: { rating: true }
-      }),
-      prisma.produce.findMany({
-        take: 5,
-        orderBy: {
-          reviews: {
-            _count: 'desc'
-          }
-        },
-        select: {
-          id: true,
-          name: true,
-          price: true,
-          _count: {
-            select: {
-              reviews: true,
-              OrderItem: true
-            }
-          },
-          reviews: {
-            select: { rating: true }
-          }
-        }
       })
     ]);
 
@@ -108,10 +66,8 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     const [
       totalOrders,
       totalRevenue,
-      completedOrders,
-      pendingOrders,
-      ordersByMonth,
-      revenueByMonth
+      deliveredOrders,
+      pendingOrders
     ] = await Promise.all([
       prisma.order.count({
         where: {
@@ -120,14 +76,14 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
       }),
       prisma.order.aggregate({
         where: {
-          status: 'COMPLETED',
+          status: 'DELIVERED',
           createdAt: { gte: start, lte: end }
         },
-        _sum: { total: true }
+        _sum: { totalAmount: true }
       }),
       prisma.order.count({
         where: { 
-          status: 'COMPLETED',
+          status: 'DELIVERED',
           createdAt: { gte: start, lte: end }
         }
       }),
@@ -136,44 +92,18 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
           status: 'PENDING',
           createdAt: { gte: start, lte: end }
         }
-      }),
-      prisma.order.groupBy({
-        by: ['createdAt'],
-        _count: { id: true },
-        where: {
-          createdAt: { gte: start, lte: end }
-        },
-        orderBy: { createdAt: 'asc' }
-      }),
-      prisma.order.groupBy({
-        by: ['createdAt'],
-        _sum: { total: true },
-        where: {
-          status: 'COMPLETED',
-          createdAt: { gte: start, lte: end }
-        },
-        orderBy: { createdAt: 'asc' }
       })
     ]);
 
     // Expert Analytics
     const [
       totalExperts,
-      activeExperts,
       totalConversations,
       totalArticles,
       expertEngagement
     ] = await Promise.all([
       prisma.user.count({
         where: { role: 'EXPERT' }
-      }),
-      prisma.user.count({
-        where: {
-          role: 'EXPERT',
-          lastActiveAt: {
-            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          }
-        }
       }),
       prisma.conversation.count({
         where: {
@@ -200,40 +130,17 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     ]);
 
     // System Health Metrics
-    const [
-      errorLogs,
-      systemAlerts,
-      databaseSize
-    ] = await Promise.all([
-      prisma.systemLog.count({
-        where: {
-          level: 'ERROR',
-          createdAt: { gte: start, lte: end }
-        }
-      }),
-      prisma.alert.count({
-        where: {
-          isResolved: false,
-          createdAt: { gte: start, lte: end }
-        }
-      }),
-      prisma.$queryRaw`
-        SELECT 
-          table_name,
-          pg_size_pretty(pg_total_relation_size(table_name::regclass)) as size,
-          pg_total_relation_size(table_name::regclass) as bytes
-        FROM information_schema.tables 
-        WHERE table_schema = 'public'
-        ORDER BY pg_total_relation_size(table_name::regclass) DESC
-        LIMIT 10
-      `
-    ]);
+    const unresolvedAlerts = await prisma.systemAlert.count({
+      where: {
+        isResolved: false
+      }
+    });
 
     const analytics = {
       users: {
         total: totalUsers,
         newThisMonth: newUsersThisMonth,
-        activeUsers: activeUsers,
+        activeUsers: totalUsers,
         byRole: usersByRole.reduce((acc: any, role: typeof usersByRole[0]) => {
           acc[role.role] = role._count.role;
           return acc;
@@ -243,34 +150,22 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
       products: {
         total: totalProducts,
         active: activeProducts,
-        byCategory: productsByCategory,
-        averageRating: averageProductRating._avg.rating || 0,
-        topProducts: topProducts.map((product: typeof topProducts[0]) => ({
-          ...product,
-          averageRating: product.reviews.length > 0 
-            ? product.reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / product.reviews.length
-            : 0
-        }))
+        averageRating: averageProductRating._avg.rating || 0
       },
       orders: {
         total: totalOrders,
-        completed: completedOrders,
+        completed: deliveredOrders,
         pending: pendingOrders,
-        revenue: totalRevenue._sum.total || 0,
-        monthlyOrders: ordersByMonth,
-        monthlyRevenue: revenueByMonth
+        revenue: totalRevenue._sum.totalAmount || 0
       },
       experts: {
         total: totalExperts,
-        active: activeExperts,
         totalConversations,
         totalArticles,
         topExperts: expertEngagement
       },
       system: {
-        errorLogs,
-        systemAlerts,
-        databaseTables: databaseSize
+        unresolvedAlerts
       }
     };
 
@@ -297,7 +192,6 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
  */
 router.get("/dashboard", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const today = new Date();
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -320,15 +214,15 @@ router.get("/dashboard", adminOnlyRoute, async (req: Request, res: Response) => 
       }),
       prisma.order.aggregate({
         where: {
-          status: 'COMPLETED',
+          status: 'DELIVERED',
           createdAt: { gte: yesterday }
         },
-        _sum: { total: true }
+        _sum: { totalAmount: true }
       }),
-      prisma.alert.count({
+      prisma.systemAlert.count({
         where: { 
           isResolved: false,
-          priority: { in: ['HIGH', 'CRITICAL'] }
+          severity: { in: ['HIGH', 'CRITICAL'] }
         }
       }),
       prisma.user.findMany({
@@ -337,14 +231,9 @@ router.get("/dashboard", adminOnlyRoute, async (req: Request, res: Response) => 
         select: {
           id: true,
           email: true,
+          name: true,
           role: true,
-          createdAt: true,
-          profile: {
-            select: {
-              firstName: true,
-              lastName: true
-            }
-          }
+          createdAt: true
         }
       })
     ]);
@@ -379,7 +268,7 @@ router.get("/dashboard", adminOnlyRoute, async (req: Request, res: Response) => 
             growthRate: orderGrowthRate
           },
           dailyRevenue: {
-            value: dailyRevenue._sum.total || 0
+            value: dailyRevenue._sum.totalAmount || 0
           },
           systemHealth: {
             criticalAlerts: systemHealth,
@@ -404,31 +293,19 @@ router.get("/dashboard", adminOnlyRoute, async (req: Request, res: Response) => 
  */
 router.get("/revenue", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const { period = 'month', year = new Date().getFullYear() } = req.query;
+    const { year = new Date().getFullYear() } = req.query;
     
-    let groupBy: any;
-    let dateRange: any;
-    
-    if (period === 'year') {
-      groupBy = { createdAt: 'year' };
-      dateRange = {
-        gte: new Date(`${year}-01-01`),
-        lt: new Date(`${parseInt(year as string) + 1}-01-01`)
-      };
-    } else {
-      groupBy = { createdAt: 'month' };
-      dateRange = {
-        gte: new Date(`${year}-01-01`),
-        lt: new Date(`${parseInt(year as string) + 1}-01-01`)
-      };
-    }
+    const dateRange = {
+      gte: new Date(`${year}-01-01`),
+      lt: new Date(`${parseInt(year as string) + 1}-01-01`)
+    };
 
     const revenueData = await prisma.order.groupBy({
       by: ['createdAt'],
-      _sum: { total: true },
+      _sum: { totalAmount: true },
       _count: { id: true },
       where: {
-        status: 'COMPLETED',
+        status: 'DELIVERED',
         createdAt: dateRange
       },
       orderBy: { createdAt: 'asc' }
@@ -455,12 +332,8 @@ router.get("/revenue", adminOnlyRoute, async (req: Request, res: Response) => {
             name: true,
             farmer: {
               select: {
-                profile: {
-                  select: {
-                    firstName: true,
-                    lastName: true
-                  }
-                }
+                name: true,
+                location: true
               }
             }
           }
@@ -477,7 +350,6 @@ router.get("/revenue", adminOnlyRoute, async (req: Request, res: Response) => {
       data: {
         revenueTimeline: revenueData,
         topProducts: productsWithDetails,
-        period,
         year
       }
     });

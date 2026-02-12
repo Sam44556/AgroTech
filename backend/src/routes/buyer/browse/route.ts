@@ -94,11 +94,6 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
               name: true
             }
           },
-          reviews: {
-            select: {
-              rating: true
-            }
-          },
           orderItems: {
             select: {
               quantity: true
@@ -145,14 +140,21 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
     ]);
 
     // Add computed fields to products
-    const productsWithStats = products.map((product: typeof products[0]) => ({
-      ...product,
-      averageRating: product.reviews.length > 0 
-        ? product.reviews.reduce((sum: number, r: typeof product.reviews[0]) => sum + r.rating, 0) / product.reviews.length 
-        : 0,
-      reviewCount: product.reviews.length,
-      totalSold: product.orderItems.reduce((sum: number, item: typeof product.orderItems[0]) => sum + item.quantity, 0),
-      remainingQuantity: product.quantity - product.orderItems.reduce((sum: number, item: typeof product.orderItems[0]) => sum + item.quantity, 0)
+    const productsWithStats = await Promise.all(products.map(async (product: typeof products[0]) => {
+      // Get reviews for this product
+      const reviews = await prisma.review.findMany({
+        where: { targetId: product.id, reviewType: 'product' },
+        select: { rating: true }
+      });
+      return {
+        ...product,
+        averageRating: reviews.length > 0 
+          ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length 
+          : 0,
+        reviewCount: reviews.length,
+        totalSold: product.orderItems.reduce((sum: number, item: typeof product.orderItems[0]) => sum + item.quantity, 0),
+        remainingQuantity: product.quantity - product.orderItems.reduce((sum: number, item: typeof product.orderItems[0]) => sum + item.quantity, 0)
+      };
     }));
 
     res.json({
@@ -213,20 +215,6 @@ router.get("/:id", buyerOnlyRoute, async (req: Request, res: Response) => {
             name: true
           }
         },
-        reviews: {
-          include: {
-            reviewer: {
-              select: {
-                name: true,
-                image: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: "desc"
-          },
-          take: 10
-        },
         orderItems: {
           select: {
             quantity: true,
@@ -250,9 +238,24 @@ router.get("/:id", buyerOnlyRoute, async (req: Request, res: Response) => {
       });
     }
 
+    // Get reviews for this product
+    const productReviews = await prisma.review.findMany({
+      where: { targetId: productId, reviewType: 'product' },
+      include: {
+        reviewer: {
+          select: {
+            name: true,
+            image: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
     // Calculate additional stats
-    const averageRating = product.reviews.length > 0 
-      ? product.reviews.reduce((sum: number, r: typeof product.reviews[0]) => sum + r.rating, 0) / product.reviews.length 
+    const averageRating = productReviews.length > 0 
+      ? productReviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / productReviews.length 
       : 0;
 
     const totalSold = product.orderItems.reduce((sum: number, item: typeof product.orderItems[0]) => sum + item.quantity, 0);
@@ -274,21 +277,23 @@ router.get("/:id", buyerOnlyRoute, async (req: Request, res: Response) => {
             name: true,
             location: true
           }
-        },
-        reviews: {
-          select: {
-            rating: true
-          }
         }
       }
     });
 
-    const similarProductsWithStats = similarProducts.map((p: typeof similarProducts[0]) => ({
-      ...p,
-      averageRating: p.reviews.length > 0 
-        ? p.reviews.reduce((sum: number, r: typeof p.reviews[0]) => sum + r.rating, 0) / p.reviews.length 
-        : 0,
-      reviewCount: p.reviews.length
+    // Get reviews for similar products
+    const similarProductsWithStats = await Promise.all(similarProducts.map(async (p: typeof similarProducts[0]) => {
+      const reviews = await prisma.review.findMany({
+        where: { targetId: p.id, reviewType: 'product' },
+        select: { rating: true }
+      });
+      return {
+        ...p,
+        averageRating: reviews.length > 0 
+          ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length 
+          : 0,
+        reviewCount: reviews.length
+      };
     }));
 
     res.json({
@@ -296,8 +301,9 @@ router.get("/:id", buyerOnlyRoute, async (req: Request, res: Response) => {
       data: {
         product: {
           ...product,
+          reviews: productReviews,
           averageRating,
-          reviewCount: product.reviews.length,
+          reviewCount: productReviews.length,
           totalSold,
           remainingQuantity
         },

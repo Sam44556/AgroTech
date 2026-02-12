@@ -52,12 +52,8 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
             select: {
               id: true,
               email: true,
-              profile: {
-                select: {
-                  firstName: true,
-                  lastName: true
-                }
-              }
+              name: true,
+              location: true
             }
           },
           category: {
@@ -68,8 +64,7 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
           },
           _count: {
             select: {
-              reviews: true,
-              OrderItem: true
+              orderItems: true
             }
           }
         }
@@ -90,18 +85,16 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
     const [
       totalProducts,
       activeProducts,
-      pendingApproval,
-      flaggedProducts,
+      soldOutProducts,
       totalRevenue
     ] = await Promise.all([
       prisma.produce.count(),
       prisma.produce.count({ where: { status: 'AVAILABLE' } }),
-      prisma.produce.count({ where: { status: 'PENDING' } }),
-      prisma.produce.count({ where: { status: 'FLAGGED' } }),
+      prisma.produce.count({ where: { status: 'SOLD_OUT' } }),
       prisma.orderItem.aggregate({
         _sum: { price: true },
         where: {
-          order: { status: 'COMPLETED' }
+          order: { status: 'DELIVERED' }
         }
       })
     ]);
@@ -120,8 +113,7 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
         statistics: {
           totalProducts,
           activeProducts,
-          pendingApproval,
-          flaggedProducts,
+          soldOut: soldOutProducts,
           totalRevenue: totalRevenue._sum.price || 0
         }
       }
@@ -150,33 +142,13 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
           select: {
             id: true,
             email: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true,
-                phone: true,
-                address: true
-              }
-            }
+            name: true,
+            phone: true,
+            location: true
           }
         },
         category: true,
-        reviews: {
-          include: {
-            user: {
-              select: {
-                profile: {
-                  select: {
-                    firstName: true,
-                    lastName: true
-                  }
-                }
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        },
-        OrderItem: {
+        orderItems: {
           include: {
             order: {
               select: {
@@ -185,12 +157,8 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
                 createdAt: true,
                 buyer: {
                   select: {
-                    profile: {
-                      select: {
-                        firstName: true,
-                        lastName: true
-                      }
-                    }
+                    name: true,
+                    email: true
                   }
                 }
               }
@@ -208,22 +176,35 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
     }
 
     // Calculate product statistics
-    const totalQuantitySold = product.OrderItem.reduce((sum: number, item: any) => sum + item.quantity, 0);
-    const totalRevenue = product.OrderItem.reduce((sum: number, item: any) => sum + item.price, 0);
-    const averageRating = product.reviews.length > 0 
-      ? product.reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / product.reviews.length 
+    const totalQuantitySold = product.orderItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    const totalRevenue = product.orderItems.reduce((sum: number, item: any) => sum + item.price, 0);
+
+    // Get reviews for this product
+    const reviews = await prisma.review.findMany({
+      where: { targetId: productId, reviewType: 'product' },
+      include: {
+        reviewer: {
+          select: { name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const averageRating = reviews.length > 0 
+      ? reviews.reduce((sum: number, review: any) => sum + review.rating, 0) / reviews.length 
       : 0;
 
     res.json({
       success: true,
       data: {
         ...product,
+        reviews,
         statistics: {
           totalQuantitySold,
           totalRevenue,
           averageRating,
-          totalReviews: product.reviews.length,
-          totalOrders: product.OrderItem.length
+          totalReviews: reviews.length,
+          totalOrders: product.orderItems.length
         }
       }
     });
@@ -238,7 +219,7 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
 });
 
 /**
- * PATCH /api/admin/market/:id/approve - Approve pending product
+ * PATCH /api/admin/market/:id/approve - Set product to AVAILABLE
  */
 router.patch("/:id/approve", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
@@ -255,26 +236,16 @@ router.patch("/:id/approve", adminOnlyRoute, async (req: Request, res: Response)
       });
     }
 
-    if (product.status !== 'PENDING') {
-      return res.status(400).json({
-        success: false,
-        message: "Product is not pending approval"
-      });
-    }
-
     const updatedProduct = await prisma.produce.update({
       where: { id: productId },
       data: {
-        status: 'AVAILABLE',
-        approvedAt: new Date(),
-        approvedBy: req.user!.id
+        status: 'AVAILABLE'
       },
       include: {
         farmer: {
           select: {
-            profile: {
-              select: { firstName: true, lastName: true }
-            }
+            name: true,
+            email: true
           }
         }
       }
@@ -282,7 +253,7 @@ router.patch("/:id/approve", adminOnlyRoute, async (req: Request, res: Response)
 
     res.json({
       success: true,
-      message: "Product approved successfully",
+      message: "Product set to available",
       data: updatedProduct
     });
 
@@ -296,19 +267,11 @@ router.patch("/:id/approve", adminOnlyRoute, async (req: Request, res: Response)
 });
 
 /**
- * PATCH /api/admin/market/:id/flag - Flag product for review
+ * PATCH /api/admin/market/:id/flag - Deactivate product (set to INACTIVE)
  */
 router.patch("/:id/flag", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const productId = req.params.id;
-    const { reason } = req.body;
-
-    if (!reason) {
-      return res.status(400).json({
-        success: false,
-        message: "Reason for flagging is required"
-      });
-    }
 
     const product = await prisma.produce.findUnique({
       where: { id: productId }
@@ -324,17 +287,13 @@ router.patch("/:id/flag", adminOnlyRoute, async (req: Request, res: Response) =>
     const updatedProduct = await prisma.produce.update({
       where: { id: productId },
       data: {
-        status: 'FLAGGED',
-        flaggedReason: reason,
-        flaggedAt: new Date(),
-        flaggedBy: req.user!.id
+        status: 'INACTIVE'
       },
       include: {
         farmer: {
           select: {
-            profile: {
-              select: { firstName: true, lastName: true }
-            }
+            name: true,
+            email: true
           }
         }
       }
@@ -342,7 +301,7 @@ router.patch("/:id/flag", adminOnlyRoute, async (req: Request, res: Response) =>
 
     res.json({
       success: true,
-      message: "Product flagged successfully",
+      message: "Product deactivated",
       data: updatedProduct
     });
 
@@ -356,7 +315,7 @@ router.patch("/:id/flag", adminOnlyRoute, async (req: Request, res: Response) =>
 });
 
 /**
- * PATCH /api/admin/market/:id/unflag - Remove flag from product
+ * PATCH /api/admin/market/:id/unflag - Reactivate product (set to AVAILABLE)
  */
 router.patch("/:id/unflag", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
@@ -373,27 +332,23 @@ router.patch("/:id/unflag", adminOnlyRoute, async (req: Request, res: Response) 
       });
     }
 
-    if (product.status !== 'FLAGGED') {
+    if (product.status !== 'INACTIVE') {
       return res.status(400).json({
         success: false,
-        message: "Product is not flagged"
+        message: "Product is not inactive"
       });
     }
 
     const updatedProduct = await prisma.produce.update({
       where: { id: productId },
       data: {
-        status: 'AVAILABLE',
-        flaggedReason: null,
-        flaggedAt: null,
-        flaggedBy: null
+        status: 'AVAILABLE'
       },
       include: {
         farmer: {
           select: {
-            profile: {
-              select: { firstName: true, lastName: true }
-            }
+            name: true,
+            email: true
           }
         }
       }
@@ -401,7 +356,7 @@ router.patch("/:id/unflag", adminOnlyRoute, async (req: Request, res: Response) 
 
     res.json({
       success: true,
-      message: "Product unflagged successfully",
+      message: "Product reactivated",
       data: updatedProduct
     });
 
@@ -426,7 +381,7 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
       include: {
         _count: {
           select: {
-            OrderItem: true
+            orderItems: true
           }
         }
       }
@@ -440,7 +395,7 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
     }
 
     // Check if product has orders
-    if (product._count.OrderItem > 0) {
+    if (product._count.orderItems > 0) {
       return res.status(400).json({
         success: false,
         message: "Cannot delete product with existing orders"
@@ -500,7 +455,7 @@ router.get("/categories", adminOnlyRoute, async (req: Request, res: Response) =>
  */
 router.post("/categories", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
 
     if (!name) {
       return res.status(400).json({
@@ -523,8 +478,7 @@ router.post("/categories", adminOnlyRoute, async (req: Request, res: Response) =
 
     const category = await prisma.category.create({
       data: {
-        name,
-        description: description || ''
+        name
       }
     });
 

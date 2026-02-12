@@ -36,11 +36,6 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
                   name: true
                 }
               },
-              reviews: {
-                select: {
-                  rating: true
-                }
-              },
               orderItems: {
                 select: {
                   quantity: true
@@ -54,21 +49,30 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
     ]);
 
     // Add computed fields and filter out unavailable products
-    const favoritesWithStats = favorites
-      .filter((fav: typeof favorites[0]) => fav.produce.status === "AVAILABLE")
-      .map((favorite: typeof favorites[0]) => ({
-        id: favorite.id,
-        addedAt: favorite.createdAt,
-        product: {
-          ...favorite.produce,
-          averageRating: favorite.produce.reviews.length > 0 
-            ? favorite.produce.reviews.reduce((sum: number, r: typeof favorite.produce.reviews[0]) => sum + r.rating, 0) / favorite.produce.reviews.length 
-            : 0,
-          reviewCount: favorite.produce.reviews.length,
-          totalSold: favorite.produce.orderItems.reduce((sum: number, item: typeof favorite.produce.orderItems[0]) => sum + item.quantity, 0),
-          remainingQuantity: favorite.produce.quantity - favorite.produce.orderItems.reduce((sum: number, item: typeof favorite.produce.orderItems[0]) => sum + item.quantity, 0)
-        }
-      }));
+    const favoritesWithStats = await Promise.all(
+      favorites
+        .filter((fav: typeof favorites[0]) => fav.produce.status === "AVAILABLE")
+        .map(async (favorite: typeof favorites[0]) => {
+          // Get reviews for this product
+          const reviews = await prisma.review.findMany({
+            where: { targetId: favorite.produce.id, reviewType: 'product' },
+            select: { rating: true }
+          });
+          return {
+            id: favorite.id,
+            addedAt: favorite.createdAt,
+            product: {
+              ...favorite.produce,
+              averageRating: reviews.length > 0 
+                ? reviews.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / reviews.length 
+                : 0,
+              reviewCount: reviews.length,
+              totalSold: favorite.produce.orderItems.reduce((sum: number, item: typeof favorite.produce.orderItems[0]) => sum + item.quantity, 0),
+              remainingQuantity: favorite.produce.quantity - favorite.produce.orderItems.reduce((sum: number, item: typeof favorite.produce.orderItems[0]) => sum + item.quantity, 0)
+            }
+          };
+        })
+    );
 
     res.json({
       success: true,

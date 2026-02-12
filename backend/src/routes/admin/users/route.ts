@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { adminOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
-import bcrypt from "bcryptjs";
 
 const router = Router();
 
@@ -12,7 +11,6 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const {
       role = 'all',
-      status = 'all',
       search,
       page = 1,
       limit = 20,
@@ -28,22 +26,10 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
       where.role = role;
     }
 
-    if (status !== 'all') {
-      where.isActive = status === 'active';
-    }
-
     if (search) {
       where.OR = [
         { email: { contains: search as string, mode: 'insensitive' } },
-        {
-          profile: {
-            OR: [
-              { firstName: { contains: search as string, mode: 'insensitive' } },
-              { lastName: { contains: search as string, mode: 'insensitive' } },
-              { phone: { contains: search as string, mode: 'insensitive' } }
-            ]
-          }
-        }
+        { name: { contains: search as string, mode: 'insensitive' } }
       ];
     }
 
@@ -59,24 +45,17 @@ router.get("/", adminOnlyRoute, async (req: Request, res: Response) => {
         select: {
           id: true,
           email: true,
+          name: true,
+          phone: true,
           role: true,
-          isActive: true,
-          isVerified: true,
+          location: true,
+          emailVerified: true,
+          image: true,
           createdAt: true,
-          lastActiveAt: true,
-          profile: {
-            select: {
-              firstName: true,
-              lastName: true,
-              phone: true,
-              address: true,
-              avatar: true
-            }
-          },
           _count: {
             select: {
-              farmerProduce: true,
-              buyerOrders: true
+              produce: true,
+              orders: true
             }
           }
         }
@@ -128,9 +107,18 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        profile: true,
-        farmerProduce: {
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        location: true,
+        emailVerified: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true,
+        produce: {
           select: {
             id: true,
             name: true,
@@ -141,10 +129,10 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
           orderBy: { createdAt: 'desc' },
           take: 5
         },
-        buyerOrders: {
+        orders: {
           select: {
             id: true,
-            total: true,
+            totalAmount: true,
             status: true,
             createdAt: true
           },
@@ -153,9 +141,9 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
         },
         _count: {
           select: {
-            farmerProduce: true,
-            buyerOrders: true,
-            reviews: true
+            produce: true,
+            orders: true,
+            reviewsGiven: true
           }
         }
       }
@@ -174,26 +162,26 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
     if (user.role === 'FARMER') {
       const farmerStats = await prisma.produce.aggregate({
         where: { farmerId: userId },
-        _sum: { stock: true },
-        _avg: { price: true }
+        _avg: { price: true },
+        _count: { id: true }
       });
       
       additionalStats = {
-        totalStock: farmerStats._sum.stock || 0,
+        totalListings: farmerStats._count.id || 0,
         averagePrice: farmerStats._avg.price || 0
       };
     }
 
     if (user.role === 'BUYER') {
       const buyerStats = await prisma.order.aggregate({
-        where: { buyerId: userId, status: 'COMPLETED' },
-        _sum: { total: true },
+        where: { buyerId: userId, status: 'DELIVERED' },
+        _sum: { totalAmount: true },
         _count: { id: true }
       });
       
       additionalStats = {
-        totalSpent: buyerStats._sum.total || 0,
-        completedOrders: buyerStats._count || 0
+        totalSpent: buyerStats._sum.totalAmount || 0,
+        completedOrders: buyerStats._count.id || 0
       };
     }
 
@@ -232,22 +220,23 @@ router.get("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/admin/users - Create new user
+ * POST /api/admin/users - Create new user (via Better Auth account)
  */
 router.post("/", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const {
       email,
-      password,
+      name,
       role,
-      profile
+      phone,
+      location
     } = req.body;
 
     // Validate required fields
-    if (!email || !password || !role) {
+    if (!email || !role) {
       return res.status(400).json({
         success: false,
-        message: "Email, password, and role are required"
+        message: "Email and role are required"
       });
     }
 
@@ -263,38 +252,31 @@ router.post("/", adminOnlyRoute, async (req: Request, res: Response) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user with profile
+    // Create user
     const user = await prisma.user.create({
       data: {
         email,
-        password: hashedPassword,
+        name: name || '',
         role,
-        isActive: true,
-        isVerified: true, // Admin created users are auto-verified
-        profile: profile ? {
-          create: {
-            firstName: profile.firstName || '',
-            lastName: profile.lastName || '',
-            phone: profile.phone || '',
-            address: profile.address || ''
-          }
-        } : undefined
+        phone: phone || null,
+        location: location || null,
+        emailVerified: true
       },
-      include: {
-        profile: true
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        location: true,
+        createdAt: true
       }
     });
-
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
 
     res.status(201).json({
       success: true,
       message: "User created successfully",
-      data: userWithoutPassword
+      data: user
     });
 
   } catch (error) {
@@ -315,17 +297,17 @@ router.put("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
     const adminId = req.user!.id;
     const {
       email,
+      name,
       role,
-      isActive,
-      isVerified,
-      profile
+      phone,
+      location
     } = req.body;
 
-    // Prevent admin from deactivating themselves
-    if (userId === adminId && isActive === false) {
+    // Prevent admin from changing their own role
+    if (userId === adminId && role && role !== 'ADMIN') {
       return res.status(400).json({
         success: false,
-        message: "You cannot deactivate your own account"
+        message: "You cannot change your own role"
       });
     }
 
@@ -358,49 +340,33 @@ router.put("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
     // Prepare update data
     const updateData: any = {};
     if (email !== undefined) updateData.email = email;
+    if (name !== undefined) updateData.name = name;
     if (role !== undefined) updateData.role = role;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (isVerified !== undefined) updateData.isVerified = isVerified;
+    if (phone !== undefined) updateData.phone = phone;
+    if (location !== undefined) updateData.location = location;
 
     // Update user
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
-      include: {
-        profile: true
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        role: true,
+        location: true,
+        emailVerified: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true
       }
-    });
-
-    // Update profile if provided
-    if (profile) {
-      await prisma.profile.upsert({
-        where: { userId },
-        update: {
-          firstName: profile.firstName || undefined,
-          lastName: profile.lastName || undefined,
-          phone: profile.phone || undefined,
-          address: profile.address || undefined
-        },
-        create: {
-          userId,
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          phone: profile.phone || '',
-          address: profile.address || ''
-        }
-      });
-    }
-
-    // Fetch updated user with profile
-    const userWithProfile = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { profile: true }
     });
 
     res.json({
       success: true,
       message: "User updated successfully",
-      data: userWithProfile
+      data: updatedUser
     });
 
   } catch (error) {
@@ -460,14 +426,14 @@ router.delete("/:id", adminOnlyRoute, async (req: Request, res: Response) => {
 });
 
 /**
- * PATCH /api/admin/users/:id/toggle-status - Toggle user active status
+ * PATCH /api/admin/users/:id/toggle-status - Toggle user verified status
  */
 router.patch("/:id/toggle-status", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const userId = req.params.id;
     const adminId = req.user!.id;
 
-    // Prevent admin from deactivating themselves
+    // Prevent admin from toggling themselves
     if (userId === adminId) {
       return res.status(400).json({
         success: false,
@@ -489,24 +455,19 @@ router.patch("/:id/toggle-status", adminOnlyRoute, async (req: Request, res: Res
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        isActive: !user.isActive
+        emailVerified: !user.emailVerified
       },
       select: {
         id: true,
         email: true,
-        isActive: true,
-        profile: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        }
+        name: true,
+        emailVerified: true
       }
     });
 
     res.json({
       success: true,
-      message: updatedUser.isActive ? "User activated" : "User deactivated",
+      message: updatedUser.emailVerified ? "User verified" : "User unverified",
       data: updatedUser
     });
 
@@ -520,17 +481,25 @@ router.patch("/:id/toggle-status", adminOnlyRoute, async (req: Request, res: Res
 });
 
 /**
- * PATCH /api/admin/users/:id/reset-password - Reset user password
+ * PATCH /api/admin/users/:id/change-role - Change user role
  */
-router.patch("/:id/reset-password", adminOnlyRoute, async (req: Request, res: Response) => {
+router.patch("/:id/change-role", adminOnlyRoute, async (req: Request, res: Response) => {
   try {
     const userId = req.params.id;
-    const { password } = req.body;
+    const adminId = req.user!.id;
+    const { role } = req.body;
 
-    if (!password || password.length < 6) {
+    if (userId === adminId) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters long"
+        message: "You cannot change your own role"
+      });
+    }
+
+    if (!role || !['FARMER', 'BUYER', 'EXPERT', 'ADMIN'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid role is required (FARMER, BUYER, EXPERT, ADMIN)"
       });
     }
 
@@ -545,26 +514,28 @@ router.patch("/:id/reset-password", adminOnlyRoute, async (req: Request, res: Re
       });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        password: hashedPassword
+      data: { role },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true
       }
     });
 
     res.json({
       success: true,
-      message: "Password reset successfully"
+      message: "User role updated successfully",
+      data: updatedUser
     });
 
   } catch (error) {
-    console.error("Error resetting password:", error);
+    console.error("Error changing user role:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to reset password"
+      message: "Failed to change user role"
     });
   }
 });

@@ -355,8 +355,10 @@ model ConversationParticipant {
 }
 
 model Message {
-  id      String @id @default(cuid())
-  content String
+  id          String   @id @default(cuid())
+  content     String
+  attachments String[] @default([])
+  isRead      Boolean  @default(false)
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
