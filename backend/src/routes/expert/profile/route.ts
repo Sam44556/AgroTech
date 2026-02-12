@@ -46,7 +46,9 @@ router.get("/", expertOnlyRoute, async (req: Request, res: Response) => {
           totalEarnings: 0,
           rating: 0,
           reviewCount: 0,
-          hourlyRate: 0
+          hourlyRate: 0,
+          expertise: [],
+          portfolio: []
         }
       });
     }
@@ -74,7 +76,7 @@ router.get("/", expertOnlyRoute, async (req: Request, res: Response) => {
 router.put("/", expertOnlyRoute, async (req: Request, res: Response) => {
   try {
     const expertId = req.user!.id;
-    const { name, phone, location, hourlyRate } = req.body;
+    const { name, phone, location, hourlyRate, expertise, portfolio } = req.body;
 
     const updateUserData: any = {};
     if (name !== undefined) updateUserData.name = name;
@@ -90,6 +92,39 @@ router.put("/", expertOnlyRoute, async (req: Request, res: Response) => {
         });
       }
       updateProfileData.hourlyRate = parseFloat(hourlyRate);
+    }
+
+    const normalizeArray = (value: any) => {
+      if (value === undefined) return undefined;
+      if (Array.isArray(value)) {
+        return value.map((item) => String(item).trim()).filter(Boolean);
+      }
+      if (typeof value === "string") {
+        return value.split(",").map((item) => item.trim()).filter(Boolean);
+      }
+      return null;
+    };
+
+    const expertiseArray = normalizeArray(expertise);
+    if (expertiseArray === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Expertise must be an array of strings"
+      });
+    }
+    if (expertiseArray !== undefined) {
+      updateProfileData.expertise = expertiseArray;
+    }
+
+    const portfolioArray = normalizeArray(portfolio);
+    if (portfolioArray === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Portfolio must be an array of strings"
+      });
+    }
+    if (portfolioArray !== undefined) {
+      updateProfileData.portfolio = portfolioArray;
     }
 
     const [updatedUser, updatedProfile] = await Promise.all([
@@ -115,7 +150,10 @@ router.put("/", expertOnlyRoute, async (req: Request, res: Response) => {
             where: { userId: expertId },
             update: { ...updateProfileData, updatedAt: new Date() },
             create: {
-              userId: expertId, ...updateProfileData,
+              userId: expertId,
+              expertise: [],
+              portfolio: [],
+              ...updateProfileData,
               conversationCount: 0, totalEarnings: 0,
               rating: 0, reviewCount: 0
             }
@@ -125,7 +163,9 @@ router.put("/", expertOnlyRoute, async (req: Request, res: Response) => {
             update: {},
             create: {
               userId: expertId, conversationCount: 0,
-              totalEarnings: 0, rating: 0, reviewCount: 0, hourlyRate: 0
+              totalEarnings: 0, rating: 0, reviewCount: 0, hourlyRate: 0,
+              expertise: [],
+              portfolio: []
             }
           })
     ]);

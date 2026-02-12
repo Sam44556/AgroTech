@@ -12,6 +12,7 @@ import farmerSettingsRoutes from "./routes/farmer/settings/route";
 import farmerCropsRoutes from "./routes/farmer/crops/route";
 import farmerMarketRoutes from "./routes/farmer/market/route";
 import farmerChatRoutes from "./routes/farmer/chat/route";
+import farmerExpertsRoutes from "./routes/farmer/experts/route";
 import buyerDashboardRoutes from "./routes/buyer/dashboard/route";
 import buyerProfileRoutes from "./routes/buyer/profile/route";
 import buyerBrowseRoutes from "./routes/buyer/browse/route";
@@ -62,6 +63,7 @@ app.use("/api/farmer/settings", farmerSettingsRoutes);
 app.use("/api/farmer/crops", farmerCropsRoutes);
 app.use("/api/farmer/market", farmerMarketRoutes);
 app.use("/api/farmer/chat", farmerChatRoutes);
+app.use("/api/farmer/experts", farmerExpertsRoutes);
 
 // Buyer routes
 app.use("/api/buyer/dashboard", buyerDashboardRoutes);

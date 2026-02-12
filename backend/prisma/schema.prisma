@@ -292,6 +292,9 @@ model ExpertProfile {
   reviewCount       Int   @default(0)
   hourlyRate        Float @default(0)
 
+  expertise         String[] // Array of expertise areas
+  portfolio         String[] // Array of portfolio items (URLs, descriptions, etc.)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
