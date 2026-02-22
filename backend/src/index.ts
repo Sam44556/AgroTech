@@ -28,6 +28,7 @@ import adminMarketRoutes from "./routes/admin/market/route";
 import adminProfileRoutes from "./routes/admin/profile/route";
 import adminAlertsRoutes from "./routes/admin/alerts/route";
 import authUtilsRoutes from "./routes/auth-utils/route";
+import articlesRoutes from "./routes/articles/route";
 
 const app = express();
 const PORT = 5000;
@@ -87,6 +88,9 @@ app.use("/api/admin/alerts", adminAlertsRoutes);
 
 // Auth utilities
 app.use("/api/auth-utils", authUtilsRoutes);
+
+// Public routes
+app.use("/api/articles", articlesRoutes);
 
 // Add error logging middleware for Better Auth
 app.use("/api/auth/", (req, res, next) => {
