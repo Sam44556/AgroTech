@@ -317,42 +317,7 @@ export default function FarmerChatPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-              {/* Socket Connection Status */}
-              <Badge variant={isConnected ? "default" : "secondary"} className="text-xs">
-                {isConnected ? '🟢 Connected' : '🔴 Offline'}
-              </Badge>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/farmer-dashboard" className="text-gray-600 hover:text-green-600">Dashboard</Link>
-              <Link href="/farmer-dashboard/produce" className="text-gray-600 hover:text-green-600">My Produce</Link>
-              <Link href="/farmer-dashboard/chat" className="text-green-600 font-medium">Messages</Link>
-              <Link href="/farmer-dashboard/market" className="text-gray-600 hover:text-green-600">Market Prices</Link>
-              <Link href="/farmer-dashboard/weather" className="text-gray-600 hover:text-green-600">Weather</Link>
-              <Link href="/farmer-dashboard/browse-experts" className="text-blue-600 hover:text-blue-700 font-medium">Browse Experts</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <Link href="/farmer-dashboard/settings">
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-green-100 text-green-700">FD</AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">

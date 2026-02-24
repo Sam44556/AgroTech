@@ -2,6 +2,11 @@ import { Router, Request, Response } from "express";
 import { farmerOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
 import bcrypt from "bcryptjs";
+import argon2 from "argon2";
+import crypto from "crypto";
+import { verifyStoredPassword } from "../../../utils/password";
+import { auth } from "../../../utils/auth";
+import { fromNodeHeaders } from "better-auth/node";
 
 const router = Router();
 
@@ -58,138 +63,6 @@ router.get("/", farmerOnlyRoute, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * PUT /api/farmer/settings - Update notification and privacy settings
- */
-router.put("/", farmerOnlyRoute, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const {
-      // Notification settings
-      emailNotifications,
-      pushNotifications,
-      smsNotifications,
-      marketAlerts,
-      orderUpdates,
-      chatMessages,
-      weeklyReports,
-      
-      // Privacy settings
-      profileVisibility,
-      showContactInfo,
-      showLocation,
-      allowDirectMessages,
-      dataCollectionConsent,
-      
-      // App settings
-      language,
-      timezone,
-      currency,
-      theme,
-      
-      // Security settings
-      twoFactorEnabled,
-      loginNotifications,
-      sessionTimeout
-    } = req.body;
-
-    // Validate profile visibility
-    const validVisibility = ['PUBLIC', 'PRIVATE', 'BUYERS_ONLY'];
-    if (profileVisibility && !validVisibility.includes(profileVisibility)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid profile visibility value"
-      });
-    }
-
-    // Validate theme
-    const validThemes = ['light', 'dark', 'auto'];
-    if (theme && !validThemes.includes(theme)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid theme value"
-      });
-    }
-
-    // Validate session timeout (5 minutes to 8 hours)
-    if (sessionTimeout && (sessionTimeout < 5 || sessionTimeout > 480)) {
-      return res.status(400).json({
-        success: false,
-        message: "Session timeout must be between 5 and 480 minutes"
-      });
-    }
-
-    // Update or create settings
-    const settings = await prisma.userSettings.upsert({
-      where: { userId },
-      update: {
-        // Only update fields that were provided
-        ...(emailNotifications !== undefined && { emailNotifications }),
-        ...(pushNotifications !== undefined && { pushNotifications }),
-        ...(smsNotifications !== undefined && { smsNotifications }),
-        ...(marketAlerts !== undefined && { marketAlerts }),
-        ...(orderUpdates !== undefined && { orderUpdates }),
-        ...(chatMessages !== undefined && { chatMessages }),
-        ...(weeklyReports !== undefined && { weeklyReports }),
-        
-        ...(profileVisibility !== undefined && { profileVisibility }),
-        ...(showContactInfo !== undefined && { showContactInfo }),
-        ...(showLocation !== undefined && { showLocation }),
-        ...(allowDirectMessages !== undefined && { allowDirectMessages }),
-        ...(dataCollectionConsent !== undefined && { dataCollectionConsent }),
-        
-        ...(language !== undefined && { language }),
-        ...(timezone !== undefined && { timezone }),
-        ...(currency !== undefined && { currency }),
-        ...(theme !== undefined && { theme }),
-        
-        ...(twoFactorEnabled !== undefined && { twoFactorEnabled }),
-        ...(loginNotifications !== undefined && { loginNotifications }),
-        ...(sessionTimeout !== undefined && { sessionTimeout }),
-        
-        updatedAt: new Date()
-      },
-      create: {
-        userId,
-        emailNotifications: emailNotifications ?? true,
-        pushNotifications: pushNotifications ?? true,
-        smsNotifications: smsNotifications ?? false,
-        marketAlerts: marketAlerts ?? true,
-        orderUpdates: orderUpdates ?? true,
-        chatMessages: chatMessages ?? true,
-        weeklyReports: weeklyReports ?? true,
-        
-        profileVisibility: profileVisibility ?? 'PUBLIC',
-        showContactInfo: showContactInfo ?? true,
-        showLocation: showLocation ?? true,
-        allowDirectMessages: allowDirectMessages ?? true,
-        dataCollectionConsent: dataCollectionConsent ?? true,
-        
-        language: language ?? 'en',
-        timezone: timezone ?? 'Africa/Addis_Ababa',
-        currency: currency ?? 'ETB',
-        theme: theme ?? 'light',
-        
-        twoFactorEnabled: twoFactorEnabled ?? false,
-        loginNotifications: loginNotifications ?? true,
-        sessionTimeout: sessionTimeout ?? 30
-      }
-    });
-
-    res.json({
-      success: true,
-      message: "Settings updated successfully",
-      data: settings
-    });
-
-  } catch (error) {
-    console.error("Error updating settings:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update settings"
-    });
-  }
-});
 
 /**
  * PATCH /api/farmer/settings/password - Change user password
@@ -222,10 +95,12 @@ router.patch("/password", farmerOnlyRoute, async (req: Request, res: Response) =
     }
 
     // Get user's current password hash
+    // Find the account row that stores a password for this user. Some auth providers
+    // may use different providerId values; search by userId and non-null password.
     const account = await prisma.account.findFirst({
       where: {
         userId,
-        providerId: "credential" // For email/password accounts
+        password: { not: null }
       },
       select: {
         id: true,
@@ -240,8 +115,41 @@ router.patch("/password", farmerOnlyRoute, async (req: Request, res: Response) =
       });
     }
 
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, account.password);
+    // Verify current password. Try bcrypt first (explicitly), log result, then fall back to argon2.
+      // First try to validate via Better Auth sign-in (preferred)
+      let isCurrentPasswordValid = false;
+      try {
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+        if (user?.email) {
+          try {
+            const signInRes = await auth.api.signIn({ body: { identifier: user.email, password: currentPassword } });
+            console.log('Better Auth signIn response:', { ok: !!signInRes, keys: Object.keys(signInRes || {}) });
+            // Accept common success shapes
+            if (signInRes && (signInRes.session || signInRes.success || signInRes.user)) {
+              isCurrentPasswordValid = true;
+            }
+          } catch (baErr) {
+            console.log('Better Auth signIn attempt failed or returned non-success:', baErr?.message || baErr);
+          }
+        }
+      } catch (err) {
+        console.error('Error attempting Better Auth signIn verification:', err);
+      }
+
+      // Fallback to local verification helper (covers legacy formats)
+      if (!isCurrentPasswordValid) {
+        try {
+          const stored = account.password || '';
+          console.log(`Password change: account id=${account.id}, storedPrefix=${stored.slice(0,12)}, storedLen=${stored.length}`);
+          const verify = await verifyStoredPassword(stored, currentPassword);
+          console.log(`Local verification result for account ${account.id}: valid=${verify.valid}, method=${verify.method}`);
+          isCurrentPasswordValid = verify.valid;
+        } catch (err) {
+          console.error('Error verifying current password locally:', err);
+        }
+      }
+    // Remove the misplaced closing brace here
+
     if (!isCurrentPasswordValid) {
       return res.status(400).json({
         success: false,
@@ -265,9 +173,17 @@ router.patch("/password", farmerOnlyRoute, async (req: Request, res: Response) =
     // Log security event
     console.log(`Password changed for user ${userId} at ${new Date().toISOString()}`);
 
+    // Invalidate all existing sessions so the user must re-login
+    try {
+      await prisma.session.deleteMany({ where: { userId } });
+      console.log(`Cleared sessions for user ${userId} after password change`);
+    } catch (sessErr) {
+      console.warn('Failed to clear sessions after password change:', sessErr);
+    }
+
     res.json({
       success: true,
-      message: "Password changed successfully"
+      message: "Password changed successfully. Please log in again."
     });
 
   } catch (error) {
@@ -306,7 +222,7 @@ router.delete("/account", farmerOnlyRoute, async (req: Request, res: Response) =
     const account = await prisma.account.findFirst({
       where: {
         userId,
-        providerId: "credential"
+        password: { not: null }
       },
       select: {
         password: true

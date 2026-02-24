@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   Package, 
   DollarSign, 
@@ -15,7 +14,7 @@ import {
   Plus,
   Sun,
   AlertTriangle,
-  Leaf
+  Leaf,
 } from 'lucide-react'
 import Link from 'next/link'
 import { apiGet } from '@/lib/api'
@@ -58,6 +57,7 @@ interface DashboardData {
     price: number
     quantity: number
     status: string
+    images: string[]
     totalValue: number
     createdAt: string
     ordersCount: number
@@ -168,7 +168,9 @@ export default function FarmerDashboard() {
     crop: listing.name,
     quantity: `${listing.quantity} quintals`,
     price: listing.price,
-    status: listing.status === 'AVAILABLE' ? 'active' : listing.status === 'SOLD_OUT' ? 'sold' : 'inactive'
+    status: listing.status === 'AVAILABLE' ? 'active' : listing.status === 'SOLD_OUT' ? 'sold' : 'inactive',
+    images: listing.images || [],
+    name: listing.name // for alt text in image
   }))
 
   console.log('recentListingsData:', recentListingsData)
@@ -176,39 +178,6 @@ export default function FarmerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/farmer-dashboard" className="text-green-600 font-medium">Dashboard</Link>
-              <Link href="/farmer-dashboard/produce" className="text-gray-600 hover:text-green-600">My Produce</Link>
-              <Link href="/farmer-dashboard/chat" className="text-gray-600 hover:text-green-600">Messages</Link>
-              <Link href="/farmer-dashboard/browse-experts" className="text-gray-600 hover:text-green-600">Browse Experts</Link>
-              <Link href="/farmer-dashboard/market" className="text-gray-600 hover:text-green-600">Market Prices</Link>
-              <Link href="/farmer-dashboard/weather" className="text-gray-600 hover:text-green-600">Weather</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
-              </Button>
-              <Link href="/farmer-dashboard/settings">
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-green-100 text-green-700">FD</AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Weather Alert Banner */}
@@ -303,9 +272,16 @@ export default function FarmerDashboard() {
                 {recentListings.map((listing) => (
                   <div key={listing.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                       {listing.images && listing.images.length > 0 ? (
+                                      <div className="h-40 overflow-hidden">
+                                        <img src={listing.images[0]} alt={listing.name} className="w-full h-full object-cover" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                         <Leaf className="h-6 w-6 text-green-600" />
                       </div>
+                                    )}
+                      
                       <div>
                         <p className="font-medium text-gray-900">{listing.crop}</p>
                         <p className="text-sm text-gray-500">{listing.quantity}</p>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+// using api helper for correct backend base URL
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -63,10 +64,11 @@ export default function MyProducePage() {
     quantity: '',
     unit: 'quintal',
     price: '',
-    location: '',
     description: '',
     images: [] as File[]
   })
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
 
   const [editListing, setEditListing] = useState({
     name: '',
@@ -75,6 +77,9 @@ export default function MyProducePage() {
     description: '',
     status: ''
   })
+  const [editExistingImages, setEditExistingImages] = useState<string[]>([])
+  const [editNewFiles, setEditNewFiles] = useState<File[]>([])
+  const [editNewPreviews, setEditNewPreviews] = useState<string[]>([])
 
   const statusLabel = (status: string) => {
     switch (status) {
@@ -113,8 +118,63 @@ export default function MyProducePage() {
 
   const filteredListings = listings
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length + selectedFiles.length > 5) {
+      window.alert('Maximum 5 images allowed')
+      return
+    }
+    const oversized = files.filter(file => file.size > 5 * 1024 * 1024)
+    if (oversized.length > 0) {
+      window.alert('Each image must be under 5MB')
+      return
+    }
+    setSelectedFiles([...selectedFiles, ...files])
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const removeImage = (index: number) => {
+    setSelectedFiles(selectedFiles.filter((_, i) => i !== index))
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index))
+  }
+
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length + editExistingImages.length + editNewFiles.length > 5) {
+      window.alert('Maximum 5 images allowed')
+      return
+    }
+    const oversized = files.filter(file => file.size > 5 * 1024 * 1024)
+    if (oversized.length > 0) {
+      window.alert('Each image must be under 5MB')
+      return
+    }
+    setEditNewFiles([...editNewFiles, ...files])
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setEditNewPreviews(prev => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const removeExistingImage = (index: number) => {
+    setEditExistingImages(editExistingImages.filter((_, i) => i !== index))
+  }
+
+  const removeNewImage = (index: number) => {
+    setEditNewFiles(editNewFiles.filter((_, i) => i !== index))
+    setEditNewPreviews(editNewPreviews.filter((_, i) => i !== index))
+  }
+
   const handleCreateListing = async () => {
-    // Validate required fields
     if (!newListing.cropType) {
       setError('Please select a crop type')
       return
@@ -127,42 +187,40 @@ export default function MyProducePage() {
       setError('Please enter a valid price')
       return
     }
-
     setIsLoading(true)
     setError('')
-    
     try {
-      const description = newListing.location
-        ? `${newListing.description}\nLocation: ${newListing.location}`
-        : newListing.description
-
-      await apiPost('/api/farmer/crops', {
-        name: newListing.cropType,
-        description,
-        price: Number(newListing.price),
-        quantity: Number(newListing.quantity),
-        categoryName: newListing.cropType,
-        images: [],
-        unit: newListing.unit
+      const description = newListing.description
+      const formData = new FormData()
+      formData.append('name', newListing.cropType)
+      formData.append('description', description)
+      formData.append('price', newListing.price)
+      formData.append('quantity', newListing.quantity)
+      formData.append('categoryName', newListing.cropType)
+      formData.append('unit', newListing.unit)
+      selectedFiles.forEach(file => {
+        formData.append('images', file)
       })
-
+      await apiPost('/api/farmer/crops', formData)
+      window.alert('Crop added successfully with images')
       setIsCreateOpen(false)
       setNewListing({
         cropType: '',
         quantity: '',
         unit: 'quintal',
         price: '',
-        location: '',
         description: '',
         images: []
       })
-
+      setSelectedFiles([])
+      setImagePreviews([])
       const statusParam = filterStatus === 'all' ? 'all' : filterStatus
       const response = await apiGet<{ success: boolean; data: CropListing[] }>(
         `/api/farmer/crops?status=${statusParam}&search=${encodeURIComponent(searchQuery)}`
       )
       setListings(response.data || [])
     } catch (err: any) {
+      window.alert(err.message || 'Failed to create listing')
       setError(err.message || 'Failed to create listing')
     } finally {
       setIsLoading(false)
@@ -209,6 +267,9 @@ export default function MyProducePage() {
       description: listing.description || '',
       status: listing.status
     })
+    setEditExistingImages(listing.images || [])
+    setEditNewFiles([])
+    setEditNewPreviews([])
     setIsEditOpen(true)
   }
 
@@ -232,16 +293,40 @@ export default function MyProducePage() {
     setError('')
 
     try {
+      // Upload any new images first
+      const uploadedUrls: string[] = []
+      if (editNewFiles.length > 0) {
+        for (const file of editNewFiles) {
+          const fd = new FormData()
+          fd.append('image', file)
+          try {
+            const res = await apiPost<{ message: string; imageUrl: string }>('/api/farmer/crops/upload-image', fd)
+            if (res && (res as any).imageUrl) uploadedUrls.push((res as any).imageUrl)
+          } catch (uploadErr: any) {
+            console.error('Image upload failed:', uploadErr)
+            // continue, but notify user
+            window.alert('One of the image uploads failed')
+          }
+        }
+      }
+
+      // Build images array: remaining existing images + newly uploaded ones
+      const imagesToSave = [...(editExistingImages || []), ...uploadedUrls]
+
       await apiPut(`/api/farmer/crops/${editingListing.id}`, {
         name: editListing.name,
         description: editListing.description,
         price: Number(editListing.price),
         quantity: Number(editListing.quantity),
-        status: editListing.status
+        status: editListing.status,
+        images: imagesToSave
       })
 
       setIsEditOpen(false)
       setEditingListing(null)
+      setEditExistingImages([])
+      setEditNewFiles([])
+      setEditNewPreviews([])
 
       // Refresh listings
       const statusParam = filterStatus === 'all' ? 'all' : filterStatus
@@ -258,39 +343,6 @@ export default function MyProducePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/farmer-dashboard" className="text-gray-600 hover:text-green-600">Dashboard</Link>
-              <Link href="/farmer-dashboard/produce" className="text-green-600 font-medium">My Produce</Link>
-              <Link href="/farmer-dashboard/chat" className="text-gray-600 hover:text-green-600">Messages</Link>
-              <Link href="/farmer-dashboard/browse-experts" className="text-gray-600 hover:text-green-600">Browse Experts</Link>
-              <Link href="/farmer-dashboard/market" className="text-gray-600 hover:text-green-600">Market Prices</Link>
-              <Link href="/farmer-dashboard/weather" className="text-gray-600 hover:text-green-600">Weather</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">3</span>
-              </Button>
-              <Link href="/farmer-dashboard/settings">
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-green-100 text-green-700">FD</AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
@@ -333,15 +385,7 @@ export default function MyProducePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input 
-                      id="location" 
-                      placeholder="e.g., Oromia, Arsi"
-                      value={newListing.location}
-                      onChange={(e) => setNewListing({...newListing, location: e.target.value})}
-                    />
-                  </div>
+                  {/* location field removed */}
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -390,10 +434,36 @@ export default function MyProducePage() {
                 <div className="space-y-2">
                   <Label>Photos</Label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition-colors cursor-pointer">
-                    <ImagePlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                    <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                    <input
+                      type="file"
+                      id="file-upload"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <ImagePlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                      <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                    </label>
                   </div>
+                  {imagePreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {imagePreviews.map((preview, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={preview} alt={`Preview ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border" />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(idx)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>
@@ -413,7 +483,7 @@ export default function MyProducePage() {
               setEditingListing(null)
             }
           }}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Listing</DialogTitle>
                 <DialogDescription>Update your crop listing details</DialogDescription>
@@ -472,6 +542,60 @@ export default function MyProducePage() {
                     value={editListing.description}
                     onChange={(e) => setEditListing({...editListing, description: e.target.value})}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Photos</Label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+                    <input
+                      type="file"
+                      id="edit-file-upload"
+                      multiple
+                      accept="image/*"
+                      onChange={handleEditFileSelect}
+                      className="hidden"
+                    />
+                    <label htmlFor="edit-file-upload" className="cursor-pointer">
+                      <ImagePlus className="h-6 w-6 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Click to add images</p>
+                      <p className="text-xs text-gray-400 mt-1">You can keep or remove existing images</p>
+                    </label>
+                  </div>
+
+                  {/* Existing images */}
+                  {editExistingImages.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {editExistingImages.map((src, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={src} alt={`Existing ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border" />
+                          <button
+                            type="button"
+                            onClick={() => removeExistingImage(idx)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* New previews */}
+                  {editNewPreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {editNewPreviews.map((preview, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={preview} alt={`Preview ${idx + 1}`} className="w-20 h-20 object-cover rounded-lg border" />
+                          <button
+                            type="button"
+                            onClick={() => removeNewImage(idx)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>
@@ -566,9 +690,15 @@ export default function MyProducePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredListings.map((listing) => (
             <Card key={listing.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <div className="h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                <Leaf className="h-16 w-16 text-green-400" />
-              </div>
+              {listing.images && listing.images.length > 0 ? (
+                <div className="h-40 overflow-hidden">
+                  <img src={listing.images[0]} alt={listing.name} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                  <Leaf className="h-16 w-16 text-green-400" />
+                </div>
+              )}
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>

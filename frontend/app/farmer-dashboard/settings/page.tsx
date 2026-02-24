@@ -161,35 +161,6 @@ export default function FarmerSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/farmer-dashboard" className="text-gray-600 hover:text-green-600">Dashboard</Link>
-              <Link href="/farmer-dashboard/produce" className="text-gray-600 hover:text-green-600">My Produce</Link>
-              <Link href="/farmer-dashboard/chat" className="text-gray-600 hover:text-green-600">Messages</Link>
-              <Link href="/farmer-dashboard/market" className="text-gray-600 hover:text-green-600">Market Prices</Link>
-              <Link href="/farmer-dashboard/weather" className="text-gray-600 hover:text-green-600">Weather</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-green-500">
-                <AvatarImage src="" />
-                <AvatarFallback className="bg-green-100 text-green-700">FD</AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Page Header */}
@@ -211,18 +182,12 @@ export default function FarmerSettingsPage() {
         )}
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile" className="flex items-center">
               <User className="h-4 w-4 mr-2" /> Profile
             </TabsTrigger>
             <TabsTrigger value="password" className="flex items-center">
               <Lock className="h-4 w-4 mr-2" /> Password
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center">
-              <Bell className="h-4 w-4 mr-2" /> Notifications
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center">
-              <Shield className="h-4 w-4 mr-2" /> Security
             </TabsTrigger>
           </TabsList>
 
@@ -303,10 +268,7 @@ export default function FarmerSettingsPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <Link href="/farmer-dashboard/profile" className="text-green-600 hover:text-green-700 hover:underline flex items-center">
-                    View Detailed Profile →
-                  </Link>
+                <div className="flex justify-end">
                   <Button 
                     className="bg-green-600 hover:bg-green-700"
                     onClick={handleProfileUpdate}
@@ -397,135 +359,7 @@ export default function FarmerSettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Notifications Tab */}
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>Choose what notifications you want to receive</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">Price Alerts</p>
-                    <p className="text-sm text-gray-500">Get notified when crop prices change significantly</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.priceAlerts}
-                    onCheckedChange={(checked) => setNotifications({...notifications, priceAlerts: checked})}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">Weather Alerts</p>
-                    <p className="text-sm text-gray-500">Receive severe weather warnings for your region</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.weatherAlerts}
-                    onCheckedChange={(checked) => setNotifications({...notifications, weatherAlerts: checked})}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">New Messages</p>
-                    <p className="text-sm text-gray-500">Get notified when buyers send you messages</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.newMessages}
-                    onCheckedChange={(checked) => setNotifications({...notifications, newMessages: checked})}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">SMS Notifications</p>
-                    <p className="text-sm text-gray-500">Receive important alerts via SMS</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.smsNotifications}
-                    onCheckedChange={(checked) => setNotifications({...notifications, smsNotifications: checked})}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900">Marketing Emails</p>
-                    <p className="text-sm text-gray-500">Receive tips, news, and promotional offers</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.marketingEmails}
-                    onCheckedChange={(checked) => setNotifications({...notifications, marketingEmails: checked})}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Security Tab */}
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your account security options</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                      <Shield className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Two-Factor Authentication (MFA)</p>
-                      <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
-                    </div>
-                  </div>
-                  <Switch 
-                    checked={security.mfaEnabled}
-                    onCheckedChange={(checked) => setSecurity({...security, mfaEnabled: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Bell className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Login Alerts</p>
-                      <p className="text-sm text-gray-500">Get notified when someone logs into your account</p>
-                    </div>
-                  </div>
-                  <Switch 
-                    checked={security.loginAlerts}
-                    onCheckedChange={(checked) => setSecurity({...security, loginAlerts: checked})}
-                  />
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-4">Active Sessions</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">Current Session</p>
-                        <p className="text-sm text-gray-500">Chrome on Windows • Addis Ababa, Ethiopia</p>
-                      </div>
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Active</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Button variant="destructive" className="w-full">
-                    Log Out of All Devices
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {/* Notifications and Security tabs removed as requested */}
         </Tabs>
       </main>
     </div>

@@ -1,12 +1,33 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { farmerOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
-
+import { uploadToCloudinary,   deleteFromCloudinary,upload } from "../../../utils/cloudnary";
 const router = Router();
 
 /**
- * GET /api/farmer/crops - Get farmer's crop listings
+ * Upload single product image to Cloudinary
  */
+const uploadProductImage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file) {
+      const err = new Error('No image file provided.');
+      // @ts-ignore
+      (err as any).status = 400;
+      return next(err);
+    }
+
+    const imageUrl = await uploadToCloudinary(file.buffer, 'products');
+
+    return res.status(200).json({ message: 'Image uploaded successfully!', imageUrl });
+  } catch (err) {
+    console.error('Image upload error:', err);
+    const error = new Error('Image upload failed, please try again.');
+    // @ts-ignore
+    (error as any).status = 500;
+    return next(error);
+  }
+};
 router.get("/", farmerOnlyRoute, async (req: Request, res: Response) => {
   try {
     const farmerId = req.user!.id;
@@ -75,6 +96,9 @@ router.get("/", farmerOnlyRoute, async (req: Request, res: Response) => {
   }
 });
 
+// Route for single image upload
+router.post('/upload-image', farmerOnlyRoute, upload.single('image'), uploadProductImage);
+
 /**
  * GET /api/farmer/crops/recent - Get farmer's 3 most recent crop listings
  */
@@ -96,6 +120,7 @@ router.get("/recent", farmerOnlyRoute, async (req: Request, res: Response) => {
         price: true,
         quantity: true,
         status: true,
+        images: true,
         createdAt: true,
         orderItems: {
           select: {
@@ -107,12 +132,13 @@ router.get("/recent", farmerOnlyRoute, async (req: Request, res: Response) => {
 
     console.log("✅ Found", recentCrops.length, "recent crops");
 
-    const data = recentCrops.map((crop) => ({
+    const data = recentCrops.map((crop: { id: any; name: any; price: number; quantity: number; status: any; createdAt: any; orderItems: string | any[]; images?: string[]; }) => ({
       id: crop.id,
       name: crop.name,
       price: crop.price,
       quantity: crop.quantity,
       status: crop.status,
+      images: crop.images || [],
       totalValue: crop.price * crop.quantity,
       createdAt: crop.createdAt,
       ordersCount: crop.orderItems.length
@@ -135,49 +161,40 @@ router.get("/recent", farmerOnlyRoute, async (req: Request, res: Response) => {
 /**
  * POST /api/farmer/crops - Create new crop listing
  */
-router.post("/", farmerOnlyRoute, async (req: Request, res: Response) => {
+router.post("/", farmerOnlyRoute, upload.array("images"), async (req: Request, res: Response) => {
   try {
-    const farmerId = req.user!.id;
+    const farmerId = req.user?.id;
     const {
       name,
       description,
       price,
       quantity,
       categoryName,
-      images,
       unit = "quintal"
     } = req.body;
 
-    // Validate required fields
     if (!name || !price || !quantity || !categoryName) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, price, quantity, and category are required"
-      });
+      return res.status(400).json({ success: false, message: "Name, price, quantity, and category are required" });
     }
-
-    // Validate price and quantity
     if (price <= 0 || quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Price and quantity must be positive numbers"
-      });
+      return res.status(400).json({ success: false, message: "Price and quantity must be positive numbers" });
     }
 
     // Find or create category
     let category = await prisma.category.findFirst({
-      where: { 
-        name: {
-          equals: categoryName,
-          mode: 'insensitive'
-        }
-      }
+      where: { name: { equals: categoryName, mode: 'insensitive' } }
     });
-
     if (!category) {
-      category = await prisma.category.create({
-        data: { name: categoryName }
-      });
+      category = await prisma.category.create({ data: { name: categoryName } });
+    }
+
+    // Handle multiple image uploads
+    let imageUrls: string[] = [];
+    if (req.files && (req.files as Express.Multer.File[]).length > 0) {
+      const files = req.files as Express.Multer.File[];
+      // Upload all images to Cloudinary using uploadToCloudinary
+      const uploadPromises = files.map((file) => uploadToCloudinary(file.buffer, 'products'));
+      imageUrls = await Promise.all(uploadPromises);
     }
 
     // Create the crop listing
@@ -189,35 +206,28 @@ router.post("/", farmerOnlyRoute, async (req: Request, res: Response) => {
         quantity: parseFloat(quantity),
         farmerId,
         categoryId: category.id,
-        images: images || [],
+        images: imageUrls,
         status: "AVAILABLE"
       },
       include: {
-        category: {
-          select: {
-            name: true
-          }
-        },
-        farmer: {
-          select: {
-            name: true,
-            location: true
-          }
-        }
+        category: { select: { name: true } },
+        farmer: { select: { name: true, location: true } }
       }
     });
 
     res.status(201).json({
       success: true,
-      message: "Crop listing created successfully",
+      message: "Crop listing created successfully!",
       data: crop
     });
-
-  } catch (error) {
-    console.error("Error creating crop:", error);
+  } catch (err) {
+    const errorObj: any = err instanceof Error ? { message: err.message, stack: err.stack, name: err.name } : { error: String(err) };
+    console.error('Create crop error:', errorObj);
+    // Return error details to help debugging (remove or sanitize in production)
     res.status(500).json({
       success: false,
-      message: "Failed to create crop listing"
+      message: 'Creating crop failed, please try again.',
+      details: errorObj.message || errorObj.error || null
     });
   }
 });
