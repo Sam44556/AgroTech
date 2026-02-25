@@ -37,6 +37,12 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum BidStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum MessageType {
   TEXT
   IMAGE
@@ -232,6 +238,9 @@ model OrderItem {
   id       String @id @default(cuid())
   quantity Float
   price    Float
+  status   BidStatus @default(PENDING)
+  approvedBy String?
+  approvedAt DateTime?
 
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)

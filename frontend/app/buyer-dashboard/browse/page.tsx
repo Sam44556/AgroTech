@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { apiGet, apiPost } from '@/lib/api'
 
 export default function BrowseListingsPage() {
@@ -32,6 +33,11 @@ export default function BrowseListingsPage() {
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<any>(null)
 const [negotiating, setNegotiating] = useState<string | null>(null)
+  const [bidOpen, setBidOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null)
+  const [bidQty, setBidQty] = useState<number>(1)
+  const [bidPrice, setBidPrice] = useState<number>(0)
+  const [placingBid, setPlacingBid] = useState(false)
   useEffect(() => {
     fetchProducts()
   }, [])
@@ -106,34 +112,7 @@ const [negotiating, setNegotiating] = useState<string | null>(null)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/buyer-dashboard" className="text-gray-600 hover:text-blue-600">Dashboard</Link>
-              <Link href="/buyer-dashboard/browse" className="text-blue-600 font-medium">Browse</Link>
-              <Link href="/buyer-dashboard/chat" className="text-gray-600 hover:text-blue-600">Negotiations</Link>
-              <Link href="/buyer-dashboard/favorites" className="text-gray-600 hover:text-blue-600">Favorites</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
-              <Link href="/buyer-dashboard/profile">
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-blue-100 text-blue-700">BD</AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Browse Listings</h2>
@@ -244,11 +223,12 @@ const [negotiating, setNegotiating] = useState<string | null>(null)
                       </div>
                     )}
                   </div>
-                  <Button 
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    onClick={() => handleStartNegotiation(product.farmer?.id || '')}
-                    disabled={!!negotiating || !product.farmer?.id}
-                  >
+                  <div className="flex gap-2">
+                    <Button 
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => handleStartNegotiation(product.farmer?.id || '')}
+                      disabled={!!negotiating || !product.farmer?.id}
+                    >
                     {negotiating ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -259,7 +239,19 @@ const [negotiating, setNegotiating] = useState<string | null>(null)
                         <MessageSquare className="h-4 w-4 mr-2" /> Negotiate
                       </>
                     )}
-                  </Button>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedProduct(product)
+                        setBidQty(1)
+                        setBidPrice(product.price || 0)
+                        setBidOpen(true)
+                      }}
+                    >
+                      Bid
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -296,28 +288,31 @@ const [negotiating, setNegotiating] = useState<string | null>(null)
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-green-600">{product.price?.toLocaleString()} Br</p>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Button variant="outline" size="sm" onClick={() => toggleFavorite(product.id)}>
-                          <Heart className={`h-4 w-4 ${favoriteIds.includes(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
-                        </Button>
-                        <Button 
-                          className="bg-blue-600 hover:bg-blue-700" 
-                          size="sm"
-                          onClick={() => handleStartNegotiation(product.farmer?.id || '')}
-                          disabled={negotiating || !product.farmer?.id}
-                        >
-                          {negotiating ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Starting...
-                            </>
-                          ) : (
-                            <>
-                              <MessageSquare className="h-4 w-4 mr-2" /> Negotiate
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => toggleFavorite(product.id)}>
+                            <Heart className={`h-4 w-4 ${favoriteIds.includes(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                          </Button>
+                          <Button 
+                            className="bg-blue-600 hover:bg-blue-700" 
+                            size="sm"
+                            onClick={() => handleStartNegotiation(product.farmer?.id || '')}
+                            disabled={negotiating || !product.farmer?.id}
+                          >
+                            {negotiating ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Starting...
+                              </>
+                            ) : (
+                              <>
+                                <MessageSquare className="h-4 w-4 mr-2" /> Negotiate
+                              </>
+                            )}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { setSelectedProduct(product); setBidQty(1); setBidPrice(product.price || 0); setBidOpen(true); }}>
+                            Bid
+                          </Button>
+                        </div>
                     </div>
                   </div>
                 </CardContent>
@@ -342,6 +337,46 @@ const [negotiating, setNegotiating] = useState<string | null>(null)
           </div>
         )}
       </main>
+
+      <Dialog open={bidOpen} onOpenChange={setBidOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Place a Bid</DialogTitle>
+            <DialogDescription>Make an offer for {selectedProduct?.name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm block mb-1">Quantity</label>
+              <Input type="number" value={bidQty} onChange={(e) => setBidQty(Number(e.target.value))} min={1} />
+            </div>
+            <div>
+              <label className="text-sm block mb-1">Offered price (Br)</label>
+              <Input type="number" value={bidPrice} onChange={(e) => setBidPrice(Number(e.target.value))} min={0} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setBidOpen(false)}>Cancel</Button>
+              <Button disabled={placingBid} onClick={async () => {
+                if (!selectedProduct) return
+                setPlacingBid(true)
+                try {
+                  const payload = { items: [{ produceId: selectedProduct.id, quantity: bidQty || 1, price: bidPrice || selectedProduct.price || 0 }] }
+                  const res = await apiPost('/api/buyer/orders', payload)
+                  if (res.success) {
+                    setBidOpen(false)
+                  } else {
+                    console.error('Bid failed', res)
+                  }
+                } catch (err) { console.error(err) }
+                setPlacingBid(false)
+              }}>Place Bid</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

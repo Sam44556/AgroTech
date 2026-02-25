@@ -14,23 +14,45 @@ async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T>
     body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    body,
-    credentials: "include"
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      body,
+      credentials: "include",
+    });
+  } catch (err) {
+    console.error('Network error while calling API', { url, error: err });
+    throw new Error('Network error: Failed to fetch');
+  }
 
-  const contentType = response.headers.get("content-type");
-  const isJson = contentType?.includes("application/json");
-  const data = isJson ? await response.json() : null;
+  const contentType = response.headers.get("content-type") || '';
+  const isJson = contentType.includes("application/json");
+
+  // Parse response body (JSON or text) for better logging
+  let parsedBody: any = null;
+  try {
+    parsedBody = isJson ? await response.json() : await response.text();
+  } catch (err) {
+    // Fallback when body cannot be parsed
+    parsedBody = null;
+  }
 
   if (!response.ok) {
-    const message = data?.message || data?.error || "Request failed";
+    // Log details to help debugging in the browser console
+    console.error('API request failed', {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      contentType,
+      body: parsedBody,
+    });
+    const message = (parsedBody && (parsedBody.message || parsedBody.error)) || `Request failed (${response.status})`;
     throw new Error(message);
   }
 
-  return data as T;
+  return parsedBody as T;
 }
 
 export const apiGet = <T>(path: string) => apiRequest<T>(path);

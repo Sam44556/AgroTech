@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,9 @@ export default function ExpertProfilePage() {
     expertise: "",
     portfolio: "",
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     loadProfile();
@@ -60,26 +63,25 @@ export default function ExpertProfilePage() {
     setError("");
     setSuccess("");
     try {
-      const res = await apiPut<any>("/api/expert/profile", {
-        name: formData.name,
-        phone: formData.phone,
-        location: formData.location,
-        hourlyRate: parseFloat(formData.hourlyRate) || 0,
-        expertise: formData.expertise
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        portfolio: formData.portfolio
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-      });
+      const fd = new FormData();
+      fd.append("name", formData.name);
+      fd.append("phone", formData.phone);
+      fd.append("location", formData.location);
+      fd.append("hourlyRate", String(parseFloat(formData.hourlyRate) || 0));
+      fd.append("expertise", formData.expertise);
+      fd.append("portfolio", formData.portfolio);
+      if (selectedFile) fd.append("image", selectedFile);
+
+      const res = await apiPut<any>("/api/expert/profile", fd);
       if (res.success) {
         setUser(res.data.user);
         setProfile(res.data.profile);
         setIsEditing(false);
         setSuccess("Profile updated successfully!");
         setTimeout(() => setSuccess(""), 3000);
+        try {
+          window.dispatchEvent(new CustomEvent('expertProfileUpdated', { detail: { name: res.data.user?.name, image: res.data.user?.image } }))
+        } catch (e) {}
       }
     } catch (err: any) {
       console.error("Failed to save profile:", err);
@@ -88,6 +90,20 @@ export default function ExpertProfilePage() {
       setSaving(false);
     }
   };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const openFilePicker = () => fileInputRef.current?.click();
 
   if (isLoading) {
     return (
@@ -125,14 +141,20 @@ export default function ExpertProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.image} />
-                <AvatarFallback>{user?.name?.charAt(0) || "E"}</AvatarFallback>
-              </Avatar>
-              Basic Information
-            </CardTitle>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={previewUrl ?? user?.image} />
+                  <AvatarFallback>{user?.name?.charAt(0) || "E"}</AvatarFallback>
+                </Avatar>
+                Basic Information
+              </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-center gap-4">
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                {isEditing && (
+                  <Button variant="outline" onClick={openFilePicker}>Change Photo</Button>
+                )}
+              </div>
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input id="name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} disabled={!isEditing} />

@@ -73,19 +73,7 @@ export default function ExpertDashboardPage() {
           <h1 className="text-3xl font-bold text-purple-800">Expert Dashboard</h1>
           <p className="text-gray-500 mt-1">Welcome back! Here&apos;s your overview.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/expert-dashboard/chat">
-            <Button variant="outline">Messages</Button>
-          </Link>
-          <Link href="/expert-dashboard/profile">
-            <Button variant="outline">Profile</Button>
-          </Link>
-          <Link href="/expert-dashboard/articles">
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              <FileText className="mr-2 h-4 w-4" /> Write Article
-            </Button>
-          </Link>
-        </div>
+        
       </div>
 
       {/* Stats Cards */}

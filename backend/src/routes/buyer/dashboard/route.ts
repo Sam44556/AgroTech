@@ -93,18 +93,18 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
     
     const orderIds = buyerOrders.map((o: { id: string }) => o.id);
     
-    const topCategories = orderIds.length > 0 
+    const topCategories = orderIds.length > 0
       ? await prisma.orderItem.groupBy({
           by: ['produceId'],
           where: {
             orderId: { in: orderIds }
           },
           _count: {
-            _all: true
+            produceId: true
           },
           orderBy: {
             _count: {
-              _all: 'desc'
+              produceId: 'desc'
             }
           },
           take: 5
@@ -123,8 +123,8 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
           }
         });
         return {
-          categoryName: produce?.category.name || 'Unknown',
-          purchaseCount: item._count._all
+          categoryName: produce?.category?.name ?? 'Unknown',
+          purchaseCount: item._count?.produceId ?? 0
         };
       })
     );
@@ -224,13 +224,13 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
           itemCount: order.items.length,
           createdAt: order.createdAt,
           items: order.items.map((item: typeof order.items[0]) => ({
-            productName: item.produce.name,
-            quantity: item.quantity,
-            price: item.price,
-            farmerName: item.produce.farmer.name,
-            farmerLocation: item.produce.farmer.location,
-            images: item.produce.images
-          }))
+              productName: item.produce?.name ?? 'Produce',
+              quantity: item.quantity,
+              price: item.price,
+              farmerName: item.produce?.farmer?.name ?? 'Unknown',
+              farmerLocation: item.produce?.farmer?.location ?? 'N/A',
+              images: item.produce?.images ?? []
+            }))
         })),
         
         // Recommended products

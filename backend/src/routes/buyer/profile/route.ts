@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { buyerOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
+import { uploadToCloudinary, deleteFromCloudinary, upload } from "../../../utils/cloudnary";
 
 const router = Router();
 
@@ -70,7 +71,7 @@ router.get("/", buyerOnlyRoute, async (req: Request, res: Response) => {
 /**
  * PUT /api/buyer/profile - Update buyer's profile
  */
-router.put("/", buyerOnlyRoute, async (req: Request, res: Response) => {
+router.put("/", buyerOnlyRoute, upload.single("image"), async (req: Request, res: Response) => {
   try {
     const buyerId = req.user!.id;
     const {
@@ -79,13 +80,35 @@ router.put("/", buyerOnlyRoute, async (req: Request, res: Response) => {
       location,
       deliveryAddress,
       paymentMethod
-    } = req.body;
+    } = req.body as any;
 
     // Update user basic info
     const updateUserData: any = {};
     if (name !== undefined) updateUserData.name = name;
     if (phone !== undefined) updateUserData.phone = phone;
     if (location !== undefined) updateUserData.location = location;
+
+    // If an image file is provided, upload to Cloudinary and set image
+    if (req.file) {
+      try {
+        const imageUrl = await uploadToCloudinary((req.file as Express.Multer.File).buffer, "avatars");
+
+        // Attempt to delete existing image
+        try {
+          const existing = await prisma.user.findUnique({ where: { id: buyerId }, select: { image: true } });
+          if (existing?.image) {
+            await deleteFromCloudinary(existing.image).catch((e) => console.warn("Failed to delete old image:", e));
+          }
+        } catch (e) {
+          console.warn("Failed to check/delete existing image:", e);
+        }
+
+        updateUserData.image = imageUrl;
+      } catch (uploadErr) {
+        console.error("Failed to upload profile image:", uploadErr);
+        return res.status(500).json({ success: false, message: "Failed to upload image" });
+      }
+    }
 
     // Update buyer profile specific info
     const updateProfileData: any = {};

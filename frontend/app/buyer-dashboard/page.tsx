@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   ShoppingCart, 
   MessageSquare, 
@@ -29,12 +28,25 @@ export default function BuyerDashboard() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
+        console.log('👉 Fetching buyer dashboard via apiGet /api/buyer/dashboard')
         const res = await apiGet<any>('/api/buyer/dashboard')
+        console.log('✅ apiGet returned', res)
         if (res.success) {
           setData(res.data)
         }
       } catch (err: any) {
         console.error('Failed to load dashboard:', err)
+        // Attempt a raw fetch to the backend URL to capture raw status/body for debugging
+        try {
+          const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+          const rawRes = await fetch(`${base}/api/buyer/dashboard`, { credentials: 'include' })
+          const contentType = rawRes.headers.get('content-type') || ''
+          let body: any = null
+          try { body = contentType.includes('application/json') ? await rawRes.json() : await rawRes.text() } catch (e) { body = null }
+          console.error('👉 Raw fetch result', { url: `${base}/api/buyer/dashboard`, status: rawRes.status, statusText: rawRes.statusText, contentType, body })
+        } catch (rawErr) {
+          console.error('Raw fetch also failed:', rawErr)
+        }
         setError(err.message || 'Failed to load dashboard')
       } finally {
         setLoading(false)
@@ -66,36 +78,9 @@ export default function BuyerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
-            </div>
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/buyer-dashboard" className="text-blue-600 font-medium">Dashboard</Link>
-              <Link href="/buyer-dashboard/browse" className="text-gray-600 hover:text-blue-600">Browse</Link>
-              <Link href="/buyer-dashboard/chat" className="text-gray-600 hover:text-blue-600">Negotiations</Link>
-              <Link href="/buyer-dashboard/favorites" className="text-gray-600 hover:text-blue-600">Favorites</Link>
-            </nav>
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <Link href="/buyer-dashboard/profile">
-                <Avatar className="h-8 w-8 cursor-pointer">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-blue-100 text-blue-700">BD</AvatarFallback>
-                </Avatar>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
 
+              
+            
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Welcome back! 👋</h2>

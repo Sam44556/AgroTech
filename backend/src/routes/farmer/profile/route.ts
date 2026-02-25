@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { farmerOnlyRoute } from "../../../middleware/auths";
 import { prisma } from "../../../utils/prisma";
+import { uploadToCloudinary, deleteFromCloudinary, upload } from "../../../utils/cloudnary";
 
 const router = Router();
 
@@ -60,25 +61,49 @@ router.get("/", farmerOnlyRoute, async (req: Request, res: Response) => {
 /**
  * PUT /api/farmer/profile - Update farmer's profile
  */
-router.put("/", farmerOnlyRoute, async (req: Request, res: Response) => {
+router.put("/", farmerOnlyRoute, upload.single("image"), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { name, phone, location } = req.body;
+    const { name, phone, location } = req.body as any;
+
+    // Prepare update data
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (location !== undefined) updateData.location = location;
+
+    // If an image file is included, upload to Cloudinary and set image field
+    if (req.file) {
+      try {
+        const imageUrl = await uploadToCloudinary((req.file as Express.Multer.File).buffer, "avatars");
+
+        // Delete previous image from Cloudinary if present
+        try {
+          const existing = await prisma.user.findUnique({ where: { id: userId }, select: { image: true } });
+          if (existing?.image) {
+            // best-effort delete; ignore errors
+            await deleteFromCloudinary(existing.image).catch((e) => console.warn("Failed to delete old image:", e));
+          }
+        } catch (e) {
+          console.warn("Failed to check/delete existing image:", e);
+        }
+
+        updateData.image = imageUrl;
+      } catch (uploadErr) {
+        console.error("Failed to upload profile image:", uploadErr);
+        return res.status(500).json({ success: false, message: "Failed to upload image" });
+      }
+    }
 
     // Update base user information (only fields that exist in User table)
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        ...(name && { name }),
-        ...(phone && { phone }),
-        ...(location && { location })
-      }
+      data: updateData,
+      select: { id: true, name: true, email: true, phone: true, location: true, image: true }
     });
 
     // Get farmer profile stats
-    const farmerProfile = await prisma.farmerProfile.findUnique({
-      where: { userId: userId }
-    });
+    const farmerProfile = await prisma.farmerProfile.findUnique({ where: { userId: userId } });
 
     // Return updated profile
     const completeProfile = {
@@ -91,21 +116,13 @@ router.put("/", farmerOnlyRoute, async (req: Request, res: Response) => {
       activeListings: farmerProfile?.activeListings || 0,
       totalSales: farmerProfile?.totalSales || 0,
       rating: farmerProfile?.rating || 0,
-      reviewCount: farmerProfile?.reviewCount || 0
+      reviewCount: farmerProfile?.reviewCount || 0,
     };
 
-    res.json({
-      success: true,
-      data: completeProfile,
-      message: "Profile updated successfully"
-    });
-
+    res.json({ success: true, data: completeProfile, message: "Profile updated successfully" });
   } catch (error) {
     console.error("❌ Error updating farmer profile:", error);
-    res.status(500).json({
-      error: "Failed to update profile",
-      message: "Could not save profile changes"
-    });
+    res.status(500).json({ error: "Failed to update profile", message: "Could not save profile changes" });
   }
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,9 @@ export default function BuyerProfilePage() {
   const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState({ name: "", phone: "", location: "" });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     loadProfile();
@@ -49,13 +52,25 @@ export default function BuyerProfilePage() {
     setError("");
     setSuccess("");
     try {
-      const res = await apiPut<any>("/api/buyer/profile", formData);
+      const fd = new FormData();
+      fd.append("name", formData.name);
+      fd.append("phone", formData.phone);
+      fd.append("location", formData.location);
+      if (selectedFile) fd.append("image", selectedFile);
+
+      const res = await apiPut<any>("/api/buyer/profile", fd);
       if (res.success) {
         setUser(res.data.user);
         setProfile(res.data.profile);
         setIsEditing(false);
         setSuccess("Profile updated successfully!");
         setTimeout(() => setSuccess(""), 3000);
+        // Notify layout/header about updated profile so avatar updates immediately
+        try {
+          window.dispatchEvent(new CustomEvent('buyerProfileUpdated', { detail: { name: res.data.user?.name, image: res.data.user?.image } }))
+        } catch (e) {
+          // ignore
+        }
       }
     } catch (err: any) {
       console.error("Failed to save profile:", err);
@@ -63,6 +78,22 @@ export default function BuyerProfilePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setPreviewUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
   };
 
   if (isLoading) {
@@ -101,13 +132,19 @@ export default function BuyerProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.image} />
+                <AvatarImage src={previewUrl ?? user?.image} />
                 <AvatarFallback>{user?.name?.charAt(0) || "B"}</AvatarFallback>
               </Avatar>
               Basic Information
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-4">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              {isEditing && (
+                <Button variant="outline" onClick={openFilePicker}>Change Photo</Button>
+              )}
+            </div>
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input id="name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} disabled={!isEditing} />

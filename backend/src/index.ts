@@ -12,12 +12,14 @@ import farmerSettingsRoutes from "./routes/farmer/settings/route";
 import farmerCropsRoutes from "./routes/farmer/crops/route";
 import farmerMarketRoutes from "./routes/farmer/market/route";
 import farmerChatRoutes from "./routes/farmer/chat/route";
+import farmerOrdersRoutes from "./routes/farmer/orders/route";
 import farmerExpertsRoutes from "./routes/farmer/experts/route";
 import buyerDashboardRoutes from "./routes/buyer/dashboard/route";
 import buyerProfileRoutes from "./routes/buyer/profile/route";
 import buyerBrowseRoutes from "./routes/buyer/browse/route";
 import buyerFavoritesRoutes from "./routes/buyer/favorites/route";
 import buyerChatRoutes from "./routes/buyer/chat/route";
+import buyerOrdersRoutes from "./routes/buyer/orders/route";
 import expertDashboardRoutes from "./routes/expert/dashboard/route";
 import expertProfileRoutes from "./routes/expert/profile/route";
 import expertArticlesRoutes from "./routes/expert/articles/route";
@@ -44,13 +46,20 @@ const httpServer = createServer(app);
 const io = initializeSocket(httpServer);
 
 // CORS configuration for frontend
-app.use(
-  cors({
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-  })
-);
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+// In development allow the requesting origin (useful for local setups and ports)
+const corsOptions = process.env.NODE_ENV === 'production' ? {
+  origin: [FRONTEND_ORIGIN, "http://127.0.0.1:3000"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+} : {
+  origin: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 
 // Parse JSON bodies
 app.use(express.json());
@@ -64,6 +73,7 @@ app.use("/api/farmer/settings", farmerSettingsRoutes);
 app.use("/api/farmer/crops", farmerCropsRoutes);
 app.use("/api/farmer/market", farmerMarketRoutes);
 app.use("/api/farmer/chat", farmerChatRoutes);
+app.use("/api/farmer/orders", farmerOrdersRoutes);
 app.use("/api/farmer/experts", farmerExpertsRoutes);
 
 // Buyer routes
@@ -72,6 +82,7 @@ app.use("/api/buyer/profile", buyerProfileRoutes);
 app.use("/api/buyer/browse", buyerBrowseRoutes);
 app.use("/api/buyer/favorites", buyerFavoritesRoutes);
 app.use("/api/buyer/chat", buyerChatRoutes);
+app.use("/api/buyer/orders", buyerOrdersRoutes);
 
 // Expert routes
 app.use("/api/expert/dashboard", expertDashboardRoutes);

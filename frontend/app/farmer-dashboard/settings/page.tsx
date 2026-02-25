@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,12 +34,15 @@ export default function FarmerSettingsPage() {
   const [success, setSuccess] = useState('')
 
   const [profile, setProfile] = useState({
-    name: 'Farmer Demo',
-    email: 'farmer@example.com',
-    phone: '+251 911 234 567',
-    location: 'Oromia, Arsi Zone',
-    bio: 'Growing quality Teff and Coffee for over 15 years.'
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    profilePicture: ''
   })
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const [passwords, setPasswords] = useState({
     currentPassword: '',
@@ -47,18 +50,7 @@ export default function FarmerSettingsPage() {
     confirmPassword: ''
   })
 
-  const [notifications, setNotifications] = useState({
-    priceAlerts: true,
-    weatherAlerts: true,
-    newMessages: true,
-    marketingEmails: false,
-    smsNotifications: true
-  })
-
-  const [security, setSecurity] = useState({
-    mfaEnabled: false,
-    loginAlerts: true
-  })
+ 
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -76,21 +68,9 @@ export default function FarmerSettingsPage() {
           name: user.name || '',
           email: user.email || '',
           phone: user.phone || '',
-          location: user.location || ''
+          location: user.location || '',
+          profilePicture: (user as any).image || ''
         }))
-
-        setNotifications({
-          priceAlerts: settings.marketAlerts ?? true,
-          weatherAlerts: settings.weeklyReports ?? true,
-          newMessages: settings.chatMessages ?? true,
-          marketingEmails: settings.emailNotifications ?? false,
-          smsNotifications: settings.smsNotifications ?? false
-        })
-
-        setSecurity({
-          mfaEnabled: settings.twoFactorEnabled ?? false,
-          loginAlerts: settings.loginNotifications ?? true
-        })
       } catch (error) {
         console.error('Failed to load settings:', error)
       } finally {
@@ -106,30 +86,30 @@ export default function FarmerSettingsPage() {
     setError('')
     setSuccess('')
     try {
-      await apiPut('/api/farmer/profile', {
-        name: profile.name,
-        phone: profile.phone,
-        location: profile.location
-      })
+      const fd = new FormData()
+      fd.append('name', profile.name)
+      fd.append('phone', profile.phone)
+      fd.append('location', profile.location)
+      if (selectedFile) fd.append('image', selectedFile)
 
+      await apiPut('/api/farmer/profile', fd)
+
+      // Refresh settings to get latest profile picture
       try {
-        await apiPut('/api/farmer/settings', {
-          marketAlerts: notifications.priceAlerts,
-          weeklyReports: notifications.weatherAlerts,
-          chatMessages: notifications.newMessages,
-          emailNotifications: notifications.marketingEmails,
-          smsNotifications: notifications.smsNotifications,
-          twoFactorEnabled: security.mfaEnabled,
-          loginNotifications: security.loginAlerts
-        })
-      } catch (settingsError) {
-        console.log('Settings update skipped:', settingsError)
+        const res = await apiGet<any>('/api/farmer/settings')
+        const user = res.data.user
+        setProfile(prev => ({ ...prev, profilePicture: user?.image || '' }))
+      } catch (fetchErr) {
+        console.warn('Failed to refresh profile after update', fetchErr)
       }
 
       setSuccess('Profile updated successfully!')
+      // clear selected file & preview
+      setSelectedFile(null)
+      setPreviewUrl(null)
     } catch (error: any) {
       console.error('Failed to update profile:', error)
-      setError(error.message || 'Failed to update profile')
+      setError(error?.message || 'Failed to update profile')
     } finally {
       setIsLoading(false)
     }
@@ -201,15 +181,55 @@ export default function FarmerSettingsPage() {
               <CardContent className="space-y-6">
                 {/* Avatar */}
                 <div className="flex items-center space-x-6">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="bg-green-100 text-green-700 text-2xl">FD</AvatarFallback>
-                  </Avatar>
                   <div>
-                    <Button variant="outline" className="mb-2">
+                    <Avatar className="h-24 w-24">
+                      {previewUrl ? (
+                        <AvatarImage src={previewUrl} />
+                      ) : profile.profilePicture ? (
+                        <AvatarImage src={profile.profilePicture} />
+                      ) : (
+                        <AvatarFallback className="bg-green-100 text-green-700 text-2xl">
+                          {profile.name ? profile.name.charAt(0).toUpperCase() : 'F'}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                  </div>
+                  <div>
+                    <input
+                      id="profileImage"
+                      ref={(el) => { /* placeholder, will be replaced by inputRef below */ }}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null
+                        if (!file) return
+                        if (file.size > 2 * 1024 * 1024) {
+                          setError('Image must be under 2MB')
+                          return
+                        }
+                        setSelectedFile(file)
+                        const reader = new FileReader()
+                        reader.onloadend = () => setPreviewUrl(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      className="mb-2"
+                      onClick={() => {
+                        const input = document.getElementById('profileImage') as HTMLInputElement | null
+                        input?.click()
+                      }}
+                    >
                       <Camera className="h-4 w-4 mr-2" /> Change Photo
                     </Button>
                     <p className="text-sm text-gray-500">JPG, PNG or GIF. Max 2MB.</p>
+                    {previewUrl && (
+                      <div className="mt-2">
+                        <img src={previewUrl} alt="preview" className="h-24 w-24 rounded" />
+                      </div>
+                    )}
                   </div>
                 </div>
 
