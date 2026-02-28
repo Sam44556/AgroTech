@@ -21,8 +21,6 @@ export const auth = betterAuth({
             const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
             const verificationUrl = `${frontendUrl}/auth/verify-email?token=${token}&email=${user.email}`;
 
-            console.log(`📧 AGROLINK: Triggering verification email for ${user.email}`);
-            console.log(`🔗 Verification URL: ${verificationUrl}`);
             console.log(`📧 AGROLINK: Triggering verification email for ${user.email} (Non-blocking)`);
             console.log(`🔗 Verification URL: ${verificationUrl}`);
 

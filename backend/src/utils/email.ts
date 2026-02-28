@@ -12,6 +12,7 @@ const transporter = nodemailer.createTransport({
     pass: process.env.GMAIL_PASS, // Your Gmail "App Password"
   },
   pool: true, // Use a pool of connections
+  family: 4,  // FORCE IPv4 (Fixes ENETUNREACH errors on cloud servers like Render)
 });
 
 interface EmailVerificationParams {
