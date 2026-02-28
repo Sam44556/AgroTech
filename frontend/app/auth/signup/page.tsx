@@ -33,7 +33,7 @@ export default function SignUpPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match!')
@@ -63,7 +63,18 @@ export default function SignUpPage() {
       } as any)
 
       if (result.error) {
-        setError(result.error.message || 'Failed to create account. Please try again.')
+        const errorMsg = result.error.message || '';
+        // Better Auth handles generic creation failures with obscure messages if database unique constraint fails
+        if (errorMsg.toLowerCase().includes('phone') && (errorMsg.toLowerCase().includes('unique') || errorMsg.toLowerCase().includes('already exists'))) {
+          setError('This phone number is already registered. Please try logging in or use another number.')
+        } else if (result.error.code === "USER_ALREADY_EXISTS" || result.error.code === "EMAIL_ALREADY_EXISTS") {
+          setError('This email address is already registered. Please try logging in.')
+        } else if (errorMsg.includes('P2002') && errorMsg.includes('phone')) {
+          // This catches Prisma specific unique constraint codes if they bubble up
+          setError('This phone number is already registered.')
+        } else {
+          setError(result.error.message || 'Failed to create account. Please try again.')
+        }
         return
       }
 
@@ -77,7 +88,7 @@ export default function SignUpPage() {
     }
   }
 
-  
+
 
   const roles = [
     {
@@ -106,7 +117,7 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-3 mb-4">
@@ -122,12 +133,12 @@ export default function SignUpPage() {
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="grid md:grid-cols-2">
-            
+
             {/* Left Side - Role Selection */}
             <div className="bg-gradient-to-br from-green-600 to-emerald-700 p-8 text-white">
               <h2 className="text-2xl font-bold mb-2">Choose Your Role</h2>
               <p className="text-green-100 mb-8">Select how you want to participate in the AgroLink ecosystem</p>
-              
+
               <div className="space-y-4">
                 {roles.map((role) => {
                   const IconComponent = role.icon
@@ -136,16 +147,14 @@ export default function SignUpPage() {
                       key={role.id}
                       type="button"
                       onClick={() => setSelectedRole(role.id)}
-                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                        selectedRole === role.id
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${selectedRole === role.id
                           ? 'border-white bg-white/10 shadow-lg'
                           : 'border-white/20 hover:border-white/40 hover:bg-white/5'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start space-x-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          selectedRole === role.id ? 'bg-white text-green-600' : 'bg-white/20 text-white'
-                        }`}>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${selectedRole === role.id ? 'bg-white text-green-600' : 'bg-white/20 text-white'
+                          }`}>
                           <IconComponent className="w-5 h-5" />
                         </div>
                         <div className="flex-1">
@@ -155,9 +164,8 @@ export default function SignUpPage() {
                               <CheckCircle className="w-5 h-5 text-white" />
                             )}
                           </div>
-                          <p className={`text-sm ${
-                            selectedRole === role.id ? 'text-green-100' : 'text-white/80'
-                          }`}>
+                          <p className={`text-sm ${selectedRole === role.id ? 'text-green-100' : 'text-white/80'
+                            }`}>
                             {role.description}
                           </p>
                         </div>
@@ -167,15 +175,7 @@ export default function SignUpPage() {
                 })}
               </div>
 
-              <div className="mt-8 p-4 bg-white/10 rounded-lg">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Shield className="w-5 h-5 text-green-200" />
-                  <span className="font-medium text-green-100">Secure & Trusted</span>
-                </div>
-                <p className="text-sm text-green-200">
-                  Your data is protected with enterprise-grade security. Join over 10,000+ users.
-                </p>
-              </div>
+
             </div>
 
             {/* Right Side - Sign Up Form */}
@@ -345,10 +345,10 @@ export default function SignUpPage() {
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-300" />
                   </div>
-                 
+
                 </div>
 
-                
+
               </form>
 
               <div className="mt-6 text-center">

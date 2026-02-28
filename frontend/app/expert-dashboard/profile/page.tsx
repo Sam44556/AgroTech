@@ -81,7 +81,7 @@ export default function ExpertProfilePage() {
         setTimeout(() => setSuccess(""), 3000);
         try {
           window.dispatchEvent(new CustomEvent('expertProfileUpdated', { detail: { name: res.data.user?.name, image: res.data.user?.image } }))
-        } catch (e) {}
+        } catch (e) { }
       }
     } catch (err: any) {
       console.error("Failed to save profile:", err);
@@ -141,20 +141,20 @@ export default function ExpertProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={previewUrl ?? user?.image} />
-                  <AvatarFallback>{user?.name?.charAt(0) || "E"}</AvatarFallback>
-                </Avatar>
-                Basic Information
-              </CardTitle>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={previewUrl ?? user?.image} />
+                <AvatarFallback>{user?.name?.charAt(0) || "E"}</AvatarFallback>
+              </Avatar>
+              Basic Information
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="flex items-center gap-4">
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                {isEditing && (
-                  <Button variant="outline" onClick={openFilePicker}>Change Photo</Button>
-                )}
-              </div>
+            <div className="flex items-center gap-4">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              {isEditing && (
+                <Button variant="outline" onClick={openFilePicker}>Change Photo</Button>
+              )}
+            </div>
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input id="name" value={formData.name} onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))} disabled={!isEditing} />
@@ -206,36 +206,7 @@ export default function ExpertProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Performance Stats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-purple-50 rounded-lg text-center">
-                <Star className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-purple-700">{profile?.rating?.toFixed(1) || "0.0"}</p>
-                <p className="text-sm text-purple-600">Rating ({profile?.reviewCount || 0} reviews)</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg text-center">
-                <MessageSquare className="h-5 w-5 text-blue-600 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-blue-700">{profile?.conversationCount || 0}</p>
-                <p className="text-sm text-blue-600">Conversations</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg text-center">
-                <DollarSign className="h-5 w-5 text-green-600 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-green-700">{(profile?.totalEarnings || 0).toLocaleString()} Br</p>
-                <p className="text-sm text-green-600">Total Earnings</p>
-              </div>
-              <div className="p-4 bg-amber-50 rounded-lg text-center">
-                <DollarSign className="h-5 w-5 text-amber-600 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-amber-700">{profile?.hourlyRate || 0} Br</p>
-                <p className="text-sm text-amber-600">Hourly Rate</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Account */}
         <Card>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import {
 	Menu,
 	X,
@@ -17,23 +17,23 @@ import { apiGet } from "@/lib/api"
 export default function Layout({ children }: { children: React.ReactNode }) {
 	const [menuOpen, setMenuOpen] = useState(false)
 	const router = useRouter()
+	const pathname = usePathname()
 	const [profileImage, setProfileImage] = useState<string | null>(null)
 	const [userName, setUserName] = useState<string | null>(null)
 
 	useEffect(() => {
 		let mounted = true
-		;(async () => {
-			try {
-				const res = await apiGet<any>("/api/buyer/profile")
-				const user = res?.data?.user ?? res?.data?.user
-				if (!mounted) return
-				setUserName(user?.name ?? null)
-				setProfileImage(user?.image ?? null)
-			} catch (err) {
-				console.warn("Failed to load buyer user for header avatar", err)
-			}
-		})()
-
+			; (async () => {
+				try {
+					const res = await apiGet<any>("/api/buyer/profile")
+					const user = res?.data?.user ?? res?.data?.user
+					if (!mounted) return
+					setUserName(user?.name ?? null)
+					setProfileImage(user?.image ?? null)
+				} catch (err) {
+					console.warn("Failed to load buyer user for header avatar", err)
+				}
+			})()
 		return () => { mounted = false }
 	}, [])
 
@@ -44,10 +44,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 			if (detail.name) setUserName(detail.name)
 			if (detail.image) setProfileImage(detail.image)
 		}
-
 		window.addEventListener("buyerProfileUpdated", handler as EventListener)
 		return () => window.removeEventListener("buyerProfileUpdated", handler as EventListener)
 	}, [])
+
+	// ── Active nav helpers ───────────────────────────────────────────────────────
+
+	const isActive = (href: string) =>
+		href === '/buyer-dashboard'
+			? pathname === '/buyer-dashboard'
+			: pathname?.startsWith(href)
+
+	// Desktop link classes
+	const navLink = (href: string) =>
+		`relative pb-1 font-medium transition-colors ${isActive(href)
+			? 'text-green-600 after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-green-500 after:rounded-full'
+			: 'text-gray-600 hover:text-green-600'
+		}`
+
+	// Mobile sheet button classes
+	const mobileBtn = (href: string) =>
+		`text-left px-3 py-2 rounded font-medium transition-colors ${isActive(href)
+			? 'bg-green-50 text-green-700 border-l-4 border-green-500'
+			: 'text-gray-700 hover:bg-gray-100'
+		}`
 
 	return (
 		<div>
@@ -56,17 +76,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 					<div className="flex justify-between items-center h-16">
 						<div className="flex items-center space-x-3">
 							<div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
-								     <ShoppingCart className="w-6 h-6 text-white" />
+								<ShoppingCart className="w-6 h-6 text-white" />
 							</div>
 							<h1 className="text-xl font-bold text-gray-900">AgroLink</h1>
 						</div>
 
+						{/* Desktop Nav */}
 						<nav className="hidden md:flex items-center space-x-6">
-							<Link href="/buyer-dashboard" className="text-green-600 font-medium">Dashboard</Link>
-							<Link href="/buyer-dashboard/browse" className="text-gray-600 hover:text-green-600">Browse</Link>
-							<Link href="/buyer-dashboard/orders" className="text-gray-600 hover:text-green-600">Orders</Link>
-							<Link href="/buyer-dashboard/chat" className="text-gray-600 hover:text-green-600">Messages</Link>
-							</nav>
+							<Link href="/buyer-dashboard" className={navLink('/buyer-dashboard')}>Dashboard</Link>
+							<Link href="/buyer-dashboard/browse" className={navLink('/buyer-dashboard/browse')}>Browse</Link>
+							<Link href="/buyer-dashboard/orders" className={navLink('/buyer-dashboard/orders')}>Orders</Link>
+							<Link href="/buyer-dashboard/chat" className={navLink('/buyer-dashboard/chat')}>Messages</Link>
+						</nav>
 
 						<div className="flex items-center space-x-4">
 							<Button variant="ghost" size="icon" className="relative">
@@ -78,7 +99,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 									{profileImage ? (
 										<AvatarImage src={profileImage} />
 									) : (
-										<AvatarFallback className="bg-green-100 text-green-700">{userName ? userName.charAt(0).toUpperCase() : "B"}</AvatarFallback>
+										<AvatarFallback className="bg-green-100 text-green-700">
+											{userName ? userName.charAt(0).toUpperCase() : 'B'}
+										</AvatarFallback>
 									)}
 								</Avatar>
 							</Link>
@@ -86,8 +109,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 							<Button
 								variant="ghost"
 								onClick={() => {
-									try { localStorage.removeItem("session"); } catch {}
-									router.push("/")
+									try { localStorage.removeItem('session') } catch { }
+									router.push('/')
 								}}
 							>
 								Logout
@@ -113,15 +136,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 						</div>
 					</SheetHeader>
 
-					<nav className="mt-4 flex flex-col gap-2 px-4">
-						<button onClick={async () => { await router.push('/buyer-dashboard'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100 text-green-600 font-medium">Dashboard</button>
-						<button onClick={async () => { await router.push('/buyer-dashboard/browse'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100">Browse</button>
-						<button onClick={async () => { await router.push('/buyer-dashboard/orders'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100">Orders</button>
-						<button onClick={async () => { await router.push('/buyer-dashboard/favorites'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100">Favorites</button>
-						<button onClick={async () => { await router.push('/buyer-dashboard/chat'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100">Messages</button>
-						<button onClick={async () => { await router.push('/buyer-dashboard/profile'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100">Profile</button>
-						<div className="border-t mt-3 pt-3">
-							<button onClick={() => { try { localStorage.removeItem('session') } catch {} ; router.push('/'); setMenuOpen(false) }} className="text-left px-3 py-2 rounded hover:bg-gray-100 text-red-600">Logout</button>
+					<nav className="mt-4 flex flex-col gap-1 px-4">
+						<button onClick={async () => { await router.push('/buyer-dashboard'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard')}>Dashboard</button>
+						<button onClick={async () => { await router.push('/buyer-dashboard/browse'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard/browse')}>Browse</button>
+						<button onClick={async () => { await router.push('/buyer-dashboard/orders'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard/orders')}>Orders</button>
+						<button onClick={async () => { await router.push('/buyer-dashboard/favorites'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard/favorites')}>Favorites</button>
+						<button onClick={async () => { await router.push('/buyer-dashboard/chat'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard/chat')}>Messages</button>
+						<button onClick={async () => { await router.push('/buyer-dashboard/profile'); setMenuOpen(false) }} className={mobileBtn('/buyer-dashboard/profile')}>Profile</button>
+						<div className="border-t mt-3 pt-3 flex flex-col gap-1">
+							<button
+								onClick={() => { try { localStorage.removeItem('session') } catch { }; router.push('/'); setMenuOpen(false) }}
+								className="text-left px-3 py-2 rounded text-red-600 hover:bg-red-50 font-medium transition-colors"
+							>
+								Logout
+							</button>
 						</div>
 					</nav>
 				</SheetContent>

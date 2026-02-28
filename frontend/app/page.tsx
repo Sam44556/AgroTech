@@ -44,7 +44,7 @@ export default function Home() {
               <span className="text-green-600">Farmers</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Connect directly with buyers, get real-time market prices, receive expert advice, 
+              Connect directly with buyers, get real-time market prices, receive expert advice,
               and access weather updates. Skip the middlemen and maximize your profits.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -134,4 +134,3 @@ export default function Home() {
     </div>
   )
 }
-           

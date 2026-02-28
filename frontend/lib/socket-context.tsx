@@ -65,7 +65,7 @@ export function SocketProvider({ children, userId }: SocketProviderProps) {
     console.log('🔌 Initializing Socket.IO connection for user:', userId);
 
     // Create a new Socket.IO connection
-    const socketInstance = io('http://localhost:5000', {
+    const socketInstance = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000', {
       auth: {
         userId: userId, // Send userId to backend for authentication
       },

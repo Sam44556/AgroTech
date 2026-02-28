@@ -73,7 +73,7 @@ export default function ExpertDashboardPage() {
           <h1 className="text-3xl font-bold text-purple-800">Expert Dashboard</h1>
           <p className="text-gray-500 mt-1">Welcome back! Here&apos;s your overview.</p>
         </div>
-        
+
       </div>
 
       {/* Stats Cards */}
@@ -108,37 +108,7 @@ export default function ExpertDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-3 bg-green-100 rounded-full mr-4">
-              <DollarSign className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Earnings</p>
-              <p className="text-2xl font-bold">
-                {(overview.totalEarnings || 0).toLocaleString()} Br
-              </p>
-              <p className="text-xs text-gray-500">
-                Rate: {overview.hourlyRate || 0} Br/hr
-              </p>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="flex items-center p-6">
-            <div className="p-3 bg-amber-100 rounded-full mr-4">
-              <Star className="h-6 w-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Average Rating</p>
-              <p className="text-2xl font-bold">{overview.averageRating || 0}</p>
-              <p className="text-xs text-gray-500">
-                Response rate: {overview.responseRate || 0}%
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

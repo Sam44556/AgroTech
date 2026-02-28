@@ -1,22 +1,19 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
+import {
   User,
   Phone,
   Mail,
   MapPin,
   Lock,
-  Shield,
-  Bell,
   Leaf,
   Camera,
   Save,
@@ -24,7 +21,8 @@ import {
   EyeOff
 } from 'lucide-react'
 import Link from 'next/link'
-import { apiGet, apiPut, apiPatch } from '@/lib/api'
+import { apiGet, apiPut } from '@/lib/api'
+import { authClient } from '@/lib/auth-client'
 
 export default function FarmerSettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
@@ -50,7 +48,7 @@ export default function FarmerSettingsPage() {
     confirmPassword: ''
   })
 
- 
+
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -120,15 +118,22 @@ export default function FarmerSettingsPage() {
       setError('New passwords do not match!')
       return
     }
+    if (passwords.newPassword.length < 8) {
+      setError('New password must be at least 8 characters long')
+      return;
+    }
     setIsLoading(true)
     setError('')
     setSuccess('')
     try {
-      await apiPatch('/api/farmer/settings/password', {
-        currentPassword: passwords.currentPassword,
+      const res = await authClient.changePassword({
         newPassword: passwords.newPassword,
-        confirmPassword: passwords.confirmPassword
+        currentPassword: passwords.currentPassword,
+        revokeOtherSessions: true
       })
+      if (res.error) {
+        throw new Error(res.error.message || 'Failed to change password')
+      }
       setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setSuccess('Password changed successfully!')
     } catch (error: any) {
@@ -241,10 +246,10 @@ export default function FarmerSettingsPage() {
                     <Label htmlFor="name">Full Name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input 
-                        id="name" 
+                      <Input
+                        id="name"
                         value={profile.name}
-                        onChange={(e) => setProfile({...profile, name: e.target.value})}
+                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                         className="pl-10"
                       />
                     </div>
@@ -253,11 +258,11 @@ export default function FarmerSettingsPage() {
                     <Label htmlFor="email">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input 
-                        id="email" 
+                      <Input
+                        id="email"
                         type="email"
                         value={profile.email}
-                        onChange={(e) => setProfile({...profile, email: e.target.value})}
+                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                         className="pl-10"
                       />
                     </div>
@@ -266,10 +271,10 @@ export default function FarmerSettingsPage() {
                     <Label htmlFor="phone">Phone Number</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input 
-                        id="phone" 
+                      <Input
+                        id="phone"
                         value={profile.phone}
-                        onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                         className="pl-10"
                       />
                     </div>
@@ -278,10 +283,10 @@ export default function FarmerSettingsPage() {
                     <Label htmlFor="location">Location</Label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input 
-                        id="location" 
+                      <Input
+                        id="location"
                         value={profile.location}
-                        onChange={(e) => setProfile({...profile, location: e.target.value})}
+                        onChange={(e) => setProfile({ ...profile, location: e.target.value })}
                         className="pl-10"
                       />
                     </div>
@@ -289,7 +294,7 @@ export default function FarmerSettingsPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button 
+                  <Button
                     className="bg-green-600 hover:bg-green-700"
                     onClick={handleProfileUpdate}
                     disabled={isLoading}
@@ -314,11 +319,11 @@ export default function FarmerSettingsPage() {
                   <Label htmlFor="currentPassword">Current Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input 
-                      id="currentPassword" 
+                    <Input
+                      id="currentPassword"
                       type={showCurrentPassword ? "text" : "password"}
                       value={passwords.currentPassword}
-                      onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
+                      onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })}
                       className="pl-10 pr-10"
                     />
                     <button
@@ -335,11 +340,11 @@ export default function FarmerSettingsPage() {
                   <Label htmlFor="newPassword">New Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input 
-                      id="newPassword" 
+                    <Input
+                      id="newPassword"
                       type={showNewPassword ? "text" : "password"}
                       value={passwords.newPassword}
-                      onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
+                      onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                       className="pl-10 pr-10"
                     />
                     <button
@@ -356,18 +361,18 @@ export default function FarmerSettingsPage() {
                   <Label htmlFor="confirmPassword">Confirm New Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input 
-                      id="confirmPassword" 
+                    <Input
+                      id="confirmPassword"
                       type="password"
                       value={passwords.confirmPassword}
-                      onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
+                      onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                       className="pl-10"
                     />
                   </div>
                 </div>
 
                 <div className="flex justify-end">
-                  <Button 
+                  <Button
                     className="bg-green-600 hover:bg-green-700"
                     onClick={handlePasswordChange}
                     disabled={isLoading}

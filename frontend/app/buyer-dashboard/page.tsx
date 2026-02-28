@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  ShoppingCart, 
-  MessageSquare, 
-  TrendingUp, 
-  MapPin, 
-  Bell, 
+import {
+  ShoppingCart,
+  MessageSquare,
+  TrendingUp,
+  MapPin,
+  Bell,
   Search,
   Star,
   Package,
@@ -79,8 +79,8 @@ export default function BuyerDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-              
-            
+
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Welcome back! 👋</h2>
@@ -168,8 +168,8 @@ export default function BuyerDashboard() {
                         <p className="font-bold text-green-600">{order.totalAmount?.toLocaleString()} Br</p>
                         <Badge className={
                           order.status === 'DELIVERED' ? 'bg-green-100 text-green-700' :
-                          order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                          'bg-blue-100 text-blue-700'
+                            order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                              'bg-blue-100 text-blue-700'
                         }>
                           {order.status}
                         </Badge>

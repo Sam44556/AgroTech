@@ -1,6 +1,6 @@
 import { Server as HTTPServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
-import { prisma } from "./prisma";
+import { prisma } from "./prisma.js";
 
 // Define the structure of a Socket.IO user (extends the default Socket type)
 interface AuthenticatedSocket extends Socket {
@@ -62,7 +62,7 @@ async function findOrCreateConversation(userId1: string, userId2: string): Promi
 
   // No conversation exists, so create a new one
   console.log(`🆕 Creating new conversation between ${userId1} and ${userId2}`);
-  
+
   const newConversation = await prisma.conversation.create({
     data: {
       participants: {
@@ -89,11 +89,15 @@ async function findOrCreateConversation(userId1: string, userId2: string): Promi
  * It's like creating a "two-way radio" where both sides can talk and listen anytime.
  */
 export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
-  
+
   // Create a new Socket.IO server attached to your HTTP server
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+      origin: [
+        process.env.FRONTEND_URL,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+      ].filter(Boolean) as string[],
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -105,7 +109,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     try {
       // Extract the userId from the connection handshake (sent from frontend)
       const userId = socket.handshake.auth.userId;
-      
+
       if (!userId) {
         return next(new Error("Authentication error: No user ID provided"));
       }
@@ -137,7 +141,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // Store the user as "online"
     if (socket.userId) {
       onlineUsers.set(socket.userId, socket.id);
-      
+
       // Notify all connected clients about the new online user
       io.emit("user_online", { userId: socket.userId });
     }
@@ -201,7 +205,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         socket.emit("conversation_ready", {
           conversation: {
             id: conversation?.id,
-            participants: conversation?.participants.map(p => p.user),
+            participants: conversation?.participants.map((p: any) => p.user),
             messages: conversation?.messages.reverse() || [] // Reverse to show oldest first
           }
         });
@@ -216,7 +220,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // EVENT: User joins a specific conversation room
     socket.on("join_conversation", async (conversationId: string) => {
       console.log(`📥 User ${socket.userId} joining conversation: ${conversationId}`);
-      
+
       // Verify the user is part of this conversation
       const conversation = await prisma.conversation.findFirst({
         where: {
@@ -257,7 +261,7 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
         if (!conversationId && data.recipientId) {
           console.log(`🆕 Creating conversation for message from ${socket.userId} to ${data.recipientId}`);
           conversationId = await findOrCreateConversation(socket.userId!, data.recipientId);
-          
+
           // Join the new conversation room
           socket.join(conversationId);
         }
@@ -364,11 +368,11 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
     // EVENT: User disconnects
     socket.on("disconnect", () => {
       console.log(`❌ User disconnected: ${socket.userId} (Socket ID: ${socket.id})`);
-      
+
       // Remove from online users
       if (socket.userId) {
         onlineUsers.delete(socket.userId);
-        
+
         // Notify all clients that this user is now offline
         io.emit("user_offline", { userId: socket.userId });
       }
