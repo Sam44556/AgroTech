@@ -3,7 +3,7 @@ import { Router, Request, Response } from "express";
 import { protectRoute } from "../../middleware/auths";
 import { prisma } from "../../utils/prisma";
 import { auth } from "../../utils/auth";
-import { sendVerificationEmail } from "../../utils/email";
+import { sendVerificationEmail } from "../../utils/email.js";
 import { fromNodeHeaders } from "better-auth/node";
 
 const router = Router();

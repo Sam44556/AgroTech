@@ -16,6 +16,7 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@types/bcryptjs": "^3.0.0",
+    "@types/node": "^25.1.0",
     "argon2": "^0.44.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
@@ -24,21 +25,22 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.9.1",
     "socket.io": "^4.8.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "@types/node": "^25.1.0"
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/ws": "^8.5.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
+    "@types/nodemailer": "^7.0.11",
+    "@types/react": "^19.0.0",
     "@types/socket.io": "^3.0.2",
+    "@types/ws": "^8.5.10",
     "prisma": "^5.22.0"
   }
 }
