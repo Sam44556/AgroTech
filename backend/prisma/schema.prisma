@@ -80,6 +80,9 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  isActive      Boolean  @default(true)
+  lastActiveAt  DateTime @default(now())
+
   // Better Auth relations
   sessions Session[]
   accounts Account[]
@@ -163,14 +166,27 @@ model Verification {
   @@map("verification")
 }
 
+model VerificationRequest {
+  id         String   @id @default(cuid())
+  identifier String
+  createdAt  DateTime @default(now())
+
+  @@map("verification_request")
+}
+
 model Profile {
   id     String @id @default(cuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  bio      String?
-  location String?
-  rating   Float   @default(0)
+  bio       String?
+  location  String?
+  rating    Float   @default(0)
+  firstName String?
+  lastName  String?
+  address   String?
+  phone     String?
+  avatar    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

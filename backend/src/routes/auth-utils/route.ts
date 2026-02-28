@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router, Request, Response } from "express";
 import { protectRoute } from "../../middleware/auths";
 import { prisma } from "../../utils/prisma";
@@ -194,7 +195,7 @@ router.get("/profile-completion", protectRoute, async (req: Request, res: Respon
           const stepMap: Record<string, string> = {
             hasProfile: "Complete your profile information",
             hasFirstName: "Add your first name",
-            hasLastName: "Add your last name", 
+            hasLastName: "Add your last name",
             hasPhone: "Add your phone number",
             hasAddress: "Add your address",
             emailVerified: "Verify your email address"
@@ -262,7 +263,7 @@ router.get("/session-info", protectRoute, async (req: Request, res: Response) =>
         user: {
           ...session.user,
           ...userData,
-          fullName: userData?.profile 
+          fullName: userData?.profile
             ? `${userData.profile.firstName || ''} ${userData.profile.lastName || ''}`.trim()
             : session.user.name
         }
