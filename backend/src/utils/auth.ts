@@ -23,17 +23,20 @@ export const auth = betterAuth({
 
             console.log(`📧 AGROLINK: Triggering verification email for ${user.email}`);
             console.log(`🔗 Verification URL: ${verificationUrl}`);
-            try {
-                await sendVerificationEmail({
-                    to: user.email,
-                    subject: "Verify your AgroTech Account 🌱",
-                    verificationUrl: verificationUrl,
-                    userName: user.name || "there"
-                });
-                console.log(`✅ AGROLINK: Verification email task handed off to Resend for ${user.email}`);
-            } catch (err) {
-                console.error(`❌ AGROLINK: Failed to trigger email via Resend for ${user.email}:`, err);
-            }
+            console.log(`📧 AGROLINK: Triggering verification email for ${user.email} (Non-blocking)`);
+            console.log(`🔗 Verification URL: ${verificationUrl}`);
+
+            // FIRE AND FORGET: We don't 'await' this so the sign-up is instant
+            sendVerificationEmail({
+                to: user.email,
+                subject: "Verify your AgroTech Account 🌱",
+                verificationUrl: verificationUrl,
+                userName: user.name || "there"
+            }).then(() => {
+                console.log(`✅ AGROLINK: Background email sent to ${user.email}`);
+            }).catch((err) => {
+                console.error(`❌ AGROLINK: Background email FAILED for ${user.email}:`, err);
+            });
         },
     },
 
