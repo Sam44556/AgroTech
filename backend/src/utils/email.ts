@@ -2,17 +2,19 @@ import nodemailer from 'nodemailer';
 
 // Create a transporter using Gmail SMTP
 // Note: To use this in production, you MUST use an "App Password" from Google
-// Create a transporter using Gmail SMTP with more robust settings
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL (port 465)
+  port: 587,
+  secure: false, // Use STARTTLS (port 587)
   auth: {
     user: process.env.GMAIL_USER, // Your Gmail address
     pass: process.env.GMAIL_PASS, // Your Gmail "App Password"
   },
-  pool: true, // Use a pool of connections
-  family: 4,  // FORCE IPv4 (Fixes ENETUNREACH errors on cloud servers like Render)
+  pool: true,
+  tls: {
+    ciphers: 'SSLv3', // Ensure compatibility
+    rejectUnauthorized: false
+  }
 });
 
 interface EmailVerificationParams {
