@@ -35,6 +35,11 @@ import articlesRoutes from "./routes/articles/route.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy for Render deployment (required for secure cookies)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // NEW: Create HTTP server from Express app
 // EXPLANATION: Express is just middleware. To use Socket.IO, we need the underlying HTTP server.
 // Think of it like: Express = your house, HTTP server = the foundation

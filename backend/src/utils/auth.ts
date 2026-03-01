@@ -68,12 +68,20 @@ export const auth = betterAuth({
         expiresIn: 60 * 60 * 24 * 7, // 7 days
         updateAge: 60 * 60 * 24, // 1 day
         includeAdditionalFields: true, // This includes custom user fields in session
+        cookieCache: {
+            enabled: true,
+            maxAge: 5 * 60,
+        },
     },
     advanced: {
         cookiePrefix: "agrotech",
         useSecureCookies: process.env.NODE_ENV === "production",
         crossSubDomainCookies: {
             enabled: true,
+        },
+        defaultCookieAttributes: {
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+            secure: process.env.NODE_ENV === "production",
         },
     },
     databaseHooks: {
