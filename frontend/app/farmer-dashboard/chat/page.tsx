@@ -87,7 +87,9 @@ export default function FarmerChatPage() {
     const loadUser = async () => {
       try {
         const response = await apiGet<{ user: { id: string } }>('/api/me')
-        setUserId(response.user?.id || null)
+        const loadedUserId = response.user?.id || null
+        console.log('🔑 Farmer userId loaded:', loadedUserId)
+        setUserId(loadedUserId)
       } catch {
         setUserId(null)
       }
@@ -444,6 +446,12 @@ export default function FarmerChatPage() {
                     <div className="space-y-4">
                       {messages.map((message) => {
                         const isOwn = message.senderId === userId
+                        console.log('💬 Message:', { 
+                          senderId: message.senderId, 
+                          userId: userId, 
+                          isOwn: isOwn,
+                          content: message.content.substring(0, 20)
+                        })
                         return (
                           <div
                             key={message.id}

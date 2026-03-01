@@ -80,7 +80,9 @@ export default function ExpertChatPage() {
     const loadUser = async () => {
       try {
         const response = await apiGet<{ user: { id: string } }>('/api/me')
-        setUserId(response.user?.id || null)
+        const loadedUserId = response.user?.id || null
+        console.log('🔑 Expert userId loaded:', loadedUserId)
+        setUserId(loadedUserId)
       } catch {
         setUserId(null)
       }
@@ -380,6 +382,12 @@ export default function ExpertChatPage() {
                     <div className="space-y-4">
                       {messages.map((message) => {
                         const isOwn = message.senderId === userId
+                        console.log('💬 Expert Message:', { 
+                          senderId: message.senderId, 
+                          userId: userId, 
+                          isOwn: isOwn,
+                          content: message.content.substring(0, 20)
+                        })
                         return (
                           <div
                             key={message.id}
