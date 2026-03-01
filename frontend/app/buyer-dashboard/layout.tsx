@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { apiGet } from "@/lib/api"
+import { useSocket } from "@/lib/socket-context"
 
 export default function Layout({ children }: { children: React.ReactNode }) {
 	const [menuOpen, setMenuOpen] = useState(false)
@@ -20,6 +21,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname()
 	const [profileImage, setProfileImage] = useState<string | null>(null)
 	const [userName, setUserName] = useState<string | null>(null)
+	const [userId, setUserId] = useState<string | null>(null)
+	const [unreadCount, setUnreadCount] = useState<number>(0)
+	const { socket } = useSocket()
 
 	useEffect(() => {
 		let mounted = true
@@ -30,12 +34,52 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 					if (!mounted) return
 					setUserName(user?.name ?? null)
 					setProfileImage(user?.image ?? null)
+					setUserId(user?.id ?? null)
+					// Fetch initial unread count
+					if (user?.id) {
+						try {
+							const convRes = await apiGet<any>("/api/buyer/chat/conversations")
+							const convs = convRes?.data || []
+							const unread = convs.reduce((acc: number, conv: any) => {
+								const c = (conv.messages || []).filter((m: any) => !m.isRead && m.senderId !== user.id).length
+								return acc + c
+							}, 0)
+							if (mounted) setUnreadCount(unread)
+						} catch (err) {
+							console.warn('Failed to fetch conversations for unread count', err)
+						}
+					}
 				} catch (err) {
 					console.warn("Failed to load buyer user for header avatar", err)
 				}
 			})()
 		return () => { mounted = false }
 	}, [])
+
+	// Listen for new messages via socket and increment unread when appropriate
+	useEffect(() => {
+		if (!socket) return
+		const handleNewMessage = (message: any) => {
+			// Only increment if message is for this user (i.e., sender is not user)
+			if (!userId) return
+			if (message.senderId === userId) return
+			// If currently on chat page, do not increment (user sees messages)
+			if (pathname && pathname.startsWith('/buyer-dashboard/chat')) return
+			setUnreadCount((c) => c + 1)
+		}
+
+		socket.on('new_message', handleNewMessage)
+		return () => {
+			socket.off('new_message', handleNewMessage)
+		}
+	}, [socket, userId, pathname])
+
+	// Clear unread when navigating to chat
+	useEffect(() => {
+		if (pathname && pathname.startsWith('/buyer-dashboard/chat')) {
+			setUnreadCount(0)
+		}
+	}, [pathname])
 
 	// Listen for profile updates from pages (e.g., after changing photo)
 	useEffect(() => {

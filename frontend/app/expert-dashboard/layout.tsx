@@ -7,6 +7,7 @@ import { Menu, X, Leaf, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useSocket } from "@/lib/socket-context"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -16,8 +17,11 @@ export default function Layout({ children }: LayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [unreadCount, setUnreadCount] = useState<number>(0)
   const router = useRouter()
   const pathname = usePathname()
+  const { socket } = useSocket()
 
   useEffect(() => {
     let mounted = true
@@ -28,6 +32,21 @@ export default function Layout({ children }: LayoutProps) {
           if (!mounted) return
           setUserName(user?.name ?? null)
           setProfileImage(user?.image ?? null)
+          setUserId(user?.id ?? null)
+          // Fetch initial unread count
+          if (user?.id) {
+            try {
+              const convRes = await (await import("@/lib/api")).apiGet<any>("/api/expert/chat/conversations")
+              const convs = convRes?.data || []
+              const unread = convs.reduce((acc: number, conv: any) => {
+                const c = (conv.messages || []).filter((m: any) => !m.isRead && m.senderId !== user.id).length
+                return acc + c
+              }, 0)
+              if (mounted) setUnreadCount(unread)
+            } catch (err) {
+              console.warn('Failed to fetch conversations for unread count', err)
+            }
+          }
         } catch (err) {
           console.warn("Failed to load expert user for header avatar", err)
         }
@@ -44,6 +63,31 @@ export default function Layout({ children }: LayoutProps) {
     window.addEventListener("expertProfileUpdated", handler as EventListener)
     return () => window.removeEventListener("expertProfileUpdated", handler as EventListener)
   }, [])
+
+  // Listen for new messages via socket and increment unread when appropriate
+  useEffect(() => {
+    if (!socket) return
+    const handleNewMessage = (message: any) => {
+      // Only increment if message is for this user (i.e., sender is not user)
+      if (!userId) return
+      if (message.senderId === userId) return
+      // If currently on chat page, do not increment (user sees messages)
+      if (pathname && pathname.startsWith('/expert-dashboard/chat')) return
+      setUnreadCount((c) => c + 1)
+    }
+
+    socket.on('new_message', handleNewMessage)
+    return () => {
+      socket.off('new_message', handleNewMessage)
+    }
+  }, [socket, userId, pathname])
+
+  // Clear unread when navigating to chat
+  useEffect(() => {
+    if (pathname && pathname.startsWith('/expert-dashboard/chat')) {
+      setUnreadCount(0)
+    }
+  }, [pathname])
 
   // ── Active nav helpers ──────────────────────────────────────────────────────
 
