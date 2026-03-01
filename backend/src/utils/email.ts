@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Fix for Node >= 17 IPv6 connection issues with Nodemailer
+dns.setDefaultResultOrder('ipv4first');
 
 // Create a transporter using Gmail SMTP
 // Note: To use this in production, you MUST use an "App Password" from Google
