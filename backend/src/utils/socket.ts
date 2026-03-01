@@ -290,6 +290,10 @@ export function initializeSocket(httpServer: HTTPServer): SocketIOServer {
           return;
         }
 
+        // Ensure sender is in the room (important for receiving their own message back)
+        socket.join(conversationId);
+        console.log(`✅ User ${socket.userId} ensured in room: ${conversationId}`);
+
         // Save the message to the database
         const message = await prisma.message.create({
           data: {
