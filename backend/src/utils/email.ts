@@ -1,25 +1,7 @@
-import nodemailer from 'nodemailer';
-import dns from 'dns';
+import { Resend } from 'resend';
 
-// Fix for Node >= 17 IPv6 connection issues with Nodemailer
-dns.setDefaultResultOrder('ipv4first');
-
-// Create a transporter using Gmail SMTP
-// Note: To use this in production, you MUST use an "App Password" from Google
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL (port 465)
-  auth: {
-    user: process.env.GMAIL_USER, // Your Gmail address
-    pass: process.env.GMAIL_PASS, // Your Gmail "App Password"
-  },
-  pool: true,
-  tls: {
-    ciphers: 'SSLv3', // Ensure compatibility
-    rejectUnauthorized: false
-  }
-});
+// Make sure you have RESEND_API_KEY in your .env file
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 interface EmailVerificationParams {
   to: string;
@@ -42,10 +24,10 @@ export const sendVerificationEmail = async ({
   userName = 'there'
 }: EmailVerificationParams) => {
   try {
-    console.log('🔄 Attempting to send verification email via Gmail to:', to);
+    console.log('🔄 Attempting to send verification email via Resend to:', to);
 
-    const mailOptions = {
-      from: `"AgroTech" <${process.env.GMAIL_USER}>`,
+    const data = await resend.emails.send({
+      from: 'AgroTech <onboarding@resend.dev>', // Note: This only sends to the email registered in Resend unless you add a domain
       to,
       subject,
       html: `
@@ -85,14 +67,13 @@ export const sendVerificationEmail = async ({
           <p style="color: #9ca3af; font-size: 12px; text-align: center;">© 2026 AgroTech</p>
         </div>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Verification email sent successfully via Gmail:', info.messageId);
-    return info;
+    console.log('✅ Verification email sent successfully via Resend:', data);
+    return data;
 
   } catch (error) {
-    console.error('❌ Error in sendVerificationEmail (Gmail):', error);
+    console.error('❌ Error in sendVerificationEmail (Resend):', error);
     throw error;
   }
 };
@@ -104,8 +85,8 @@ export const sendResetPasswordEmail = async ({
   userName = 'there'
 }: PasswordResetParams) => {
   try {
-    const mailOptions = {
-      from: `"AgroTech" <${process.env.GMAIL_USER}>`,
+    const data = await resend.emails.send({
+      from: 'AgroTech <onboarding@resend.dev>',
       to,
       subject,
       html: `
@@ -121,30 +102,28 @@ export const sendResetPasswordEmail = async ({
           <p>Link: ${resetUrl}</p>
         </div>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('📧 Password reset email sent successfully via Gmail:', info.messageId);
-    return info;
+    console.log('📧 Password reset email sent successfully via Resend:', data);
+    return data;
   } catch (error) {
-    console.error('Error in sendResetPasswordEmail (Gmail):', error);
+    console.error('Error in sendResetPasswordEmail (Resend):', error);
     throw error;
   }
 };
 
 export const sendWelcomeEmail = async (to: string, userName: string, userRole: string) => {
   try {
-    const mailOptions = {
-      from: `"AgroTech" <${process.env.GMAIL_USER}>`,
+    const data = await resend.emails.send({
+      from: 'AgroTech <onboarding@resend.dev>',
       to,
       subject: `Welcome to AgroTech, ${userName}! 🌱`,
       html: `<h1>Welcome to AgroTech!</h1><p>Hi ${userName}, your account as a ${userRole} is now active.</p>`,
-    };
-    const info = await transporter.sendMail(mailOptions);
-    console.log('📧 Welcome email sent successfully via Gmail:', info.messageId);
-    return info;
+    });
+    console.log('📧 Welcome email sent successfully via Resend:', data);
+    return data;
   } catch (error) {
-    console.error('Error in sendWelcomeEmail (Gmail):', error);
+    console.error('Error in sendWelcomeEmail (Resend):', error);
     throw error;
   }
 };
