@@ -5,6 +5,7 @@ import { sendVerificationEmail, sendResetPasswordEmail, sendWelcomeEmail } from 
 
 const prisma = new PrismaClient();
 export const auth = betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL || "http://localhost:5000/api/auth",
     database: prismaAdapter(prisma, {
         provider: "postgresql",
     }),
@@ -67,6 +68,13 @@ export const auth = betterAuth({
         expiresIn: 60 * 60 * 24 * 7, // 7 days
         updateAge: 60 * 60 * 24, // 1 day
         includeAdditionalFields: true, // This includes custom user fields in session
+    },
+    advanced: {
+        cookiePrefix: "agrotech",
+        useSecureCookies: process.env.NODE_ENV === "production",
+        crossSubDomainCookies: {
+            enabled: true,
+        },
     },
     databaseHooks: {
         user: {
