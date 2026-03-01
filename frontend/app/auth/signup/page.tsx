@@ -78,8 +78,8 @@ export default function SignUpPage() {
         return
       }
 
-      // Success! Account created and verification email sent
-      router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`)
+      // Success! Account created. Email verification disabled so go straight to login
+      router.push(`/auth/login?registered=true`)
     } catch (err) {
       setError('Network error. Please check your connection and try again.')
       console.error('Signup error:', err)
@@ -148,8 +148,8 @@ export default function SignUpPage() {
                       type="button"
                       onClick={() => setSelectedRole(role.id)}
                       className={`w-full text-left p-4 rounded-lg border-2 transition-all ${selectedRole === role.id
-                          ? 'border-white bg-white/10 shadow-lg'
-                          : 'border-white/20 hover:border-white/40 hover:bg-white/5'
+                        ? 'border-white bg-white/10 shadow-lg'
+                        : 'border-white/20 hover:border-white/40 hover:bg-white/5'
                         }`}
                     >
                       <div className="flex items-start space-x-3">

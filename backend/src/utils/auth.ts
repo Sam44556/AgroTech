@@ -10,7 +10,8 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
-        requireEmailVerification: true,
+        // TEMPORARILY DISABLED: Allow users to login without verifying email until a domain is set up
+        requireEmailVerification: false,
     },
     emailVerification: {
         sendOnSignUp: true,
