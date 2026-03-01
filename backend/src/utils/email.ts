@@ -8,8 +8,8 @@ dns.setDefaultResultOrder('ipv4first');
 // Note: To use this in production, you MUST use an "App Password" from Google
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Use STARTTLS (port 587)
+  port: 465,
+  secure: true, // Use SSL (port 465)
   auth: {
     user: process.env.GMAIL_USER, // Your Gmail address
     pass: process.env.GMAIL_PASS, // Your Gmail "App Password"
