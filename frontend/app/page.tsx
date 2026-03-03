@@ -1,9 +1,19 @@
 import Link from 'next/link'
 import { Leaf, ArrowRight, TrendingUp, Users, Shield } from 'lucide-react'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Home',
+  description: 'AgroLink connects Ethiopian farmers directly with buyers. Access real-time ECX market prices, expert agricultural advice, and weather updates to maximize your farming profits.',
+}
+
+// Enable static generation for instant page loads
+export const dynamic = 'force-static'
+export const revalidate = 3600 // Revalidate every hour
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-emerald-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

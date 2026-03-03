@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "analyze": "ANALYZE=true npm run build",
+    "postbuild": "next-sitemap"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

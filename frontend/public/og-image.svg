@@ -1,0 +1,49 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Gradient -->
+  <rect width="1200" height="630" fill="url(#paint0_linear)"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16a34a"/>
+      <stop offset="1" stop-color="#15803d"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Pattern background -->
+  <g opacity="0.1">
+    <circle cx="100" cy="100" r="50" fill="white"/>
+    <circle cx="1100" cy="530" r="70" fill="white"/>
+    <circle cx="950" cy="100" r="40" fill="white"/>
+  </g>
+  
+  <!-- Logo - Leaf Icon -->
+  <g transform="translate(100, 215)">
+    <rect width="80" height="80" rx="16" fill="white"/>
+    <path d="M40 20C40 20 28 28 28 36C28 41.5 32.5 46 40 46C47.5 46 52 41.5 52 36C52 28 40 20 40 20Z" fill="#16a34a"/>
+    <path d="M26 38C26 38 20 44 20 50C20 53.3 22.7 56 26 56C29.3 56 32 53.3 32 50C32 44 26 38 26 38Z" fill="#86efac"/>
+    <path d="M54 38C54 38 48 44 48 50C48 53.3 50.7 56 54 56C57.3 56 60 53.3 60 50C60 44 54 38 54 38Z" fill="#86efac"/>
+    <rect x="38" y="36" width="4" height="30" rx="2" fill="#15803d"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="220" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="bold" fill="white">
+    AgroLink
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="220" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="36" fill="white" opacity="0.9">
+    Connecting Ethiopian Farmers to Markets
+  </text>
+  
+  <!-- Features -->
+  <g transform="translate(220, 380)">
+    <text y="30" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="white" opacity="0.8">
+      ✓ Real-time Market Prices
+    </text>
+    <text y="70" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="white" opacity="0.8">
+      ✓ Direct Buyer Connection
+    </text>
+    <text y="110" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="white" opacity="0.8">
+      ✓ Expert Agricultural Advice
+    </text>
+  </g>
+</svg>

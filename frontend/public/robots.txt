@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://agrolink-ethiopia.vercel.app
+
+# Sitemaps
+Sitemap: https://agrolink-ethiopia.vercel.app/sitemap.xml
